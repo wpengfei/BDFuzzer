@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=c++11 -O3 -D_FILE_OFFSET_BITS=64 -g   CMakeFiles/run_pt.dir/run_pt.cpp.o  -o CMakeFiles/CMakeRelink.dir/run_pt  libpt.a -lmsr -lcapstone 

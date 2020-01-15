@@ -1,0 +1,53 @@
+sudo sh -c "echo core >/proc/sys/kernel/core_pattern"
+
+cd /sys/devices/system/cpu/
+sudo sh -c "echo performance | tee cpu*/cpufreq/scaling_governor"
+
+
+./afl-gcc crasher.c -o crasher
+echo "nidaye">wpf/file
+
+./afl-fuzz -i wpf/input -o wpf/output wpf/crasher @@
+
+
+python ./bin/ptfuzzer.py  "-i ../test/input -o ../test/output" "../test/crasher"
+
+python ./bin/run_with_pt.py ../test/crasher
+
+
+https://askubuntu.com/questions/991874/how-to-disable-page-table-isolation-to-regain-performance-lost-due-to-intel-cpu
+
+
+二、使用tmux分屏（既可以左右分屏，也可以上下分屏）
+
+（1）安装工具
+
+在ubuntu系统中使用sudo apt-get install tmux安装tmux工具
+
+（2）使用工具
+
+       1，输入命令tmux使用工具
+
+       2，上下分屏：ctrl + b  再按 "
+
+       3，左右分屏：ctrl + b  再按 %
+
+       4，切换屏幕：ctrl + b  再按o
+
+       5，关闭一个终端：ctrl + b  再按x
+
+       6，上下分屏与左右分屏切换： ctrl + b  再按空格键
+
+其他：
+
+    ! 将当前面板置于新窗口,即新建一个窗口,其中仅包含当前面板
+    Ctrl+方向键 以1个单元格为单位移动边缘以调整当前面板大小
+    Alt+方向键 以5个单元格为单位移动边缘以调整当前面板大小
+    空格键 可以在默认面板布局中切换，试试就知道了
+    q 显示面板编号
+    方向键 移动光标选择对应面板
+    { 向前置换当前面板
+    } 向后置换当前面板
+    Alt+o 逆时针旋转当前窗口的面板
+    Ctrl+o 顺时针旋转当前窗口的面板
+

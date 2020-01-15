@@ -1,0 +1,2 @@
+/usr/bin/ar qc libpt.a  CMakeFiles/pt.dir/pt_decoder.cpp.o CMakeFiles/pt.dir/disassembler.cpp.o CMakeFiles/pt.dir/tnt_cache.cpp.o
+/usr/bin/ranlib libpt.a

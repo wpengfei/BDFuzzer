@@ -1,0 +1,9 @@
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/install.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/list_install_components.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/rebuild_cache.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/edit_cache.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/pt.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/run_pt.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/install/local.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/install/strip.dir
+/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/test_disassemble.dir

@@ -1,0 +1,97 @@
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: /usr/bin/cc 
+Build flags: 
+Id flags: 
+
+The output was:
+1
+CMakeCCompilerId.c:183:10: error: macro names must be identifiers
+ # define .COMPILER_VERSION_MAJOR DEC(__GNUC__)
+          ^
+CMakeCCompilerId.c:185:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_MINOR DEC(__GNUC_MINOR__)
+           ^
+CMakeCCompilerId.c:188:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_PATCH DEC(__GNUC_PATCHLEVEL__)
+           ^
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: /usr/bin/cc 
+Build flags: 
+Id flags: -c
+
+The output was:
+1
+CMakeCCompilerId.c:183:10: error: macro names must be identifiers
+ # define .COMPILER_VERSION_MAJOR DEC(__GNUC__)
+          ^
+CMakeCCompilerId.c:185:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_MINOR DEC(__GNUC_MINOR__)
+           ^
+CMakeCCompilerId.c:188:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_PATCH DEC(__GNUC_PATCHLEVEL__)
+           ^
+
+
+Compiling the C compiler identification source file "CMakeCCompilerId.c" failed.
+Compiler: /usr/bin/cc 
+Build flags: 
+Id flags: -Aa
+
+The output was:
+1
+<command-line>:0:1: error: missing '(' after predicate
+CMakeCCompilerId.c:183:10: error: macro names must be identifiers
+ # define .COMPILER_VERSION_MAJOR DEC(__GNUC__)
+          ^
+CMakeCCompilerId.c:185:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_MINOR DEC(__GNUC_MINOR__)
+           ^
+CMakeCCompilerId.c:188:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_PATCH DEC(__GNUC_PATCHLEVEL__)
+           ^
+
+
+Checking whether the C compiler is IAR using "" did not match "IAR .+ Compiler":
+cc: fatal error: no input files
+compilation terminated.
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: 
+Id flags: 
+
+The output was:
+1
+CMakeCXXCompilerId.cpp:185:10: error: macro names must be identifiers
+ # define .COMPILER_VERSION_MAJOR DEC(__GNUC__)
+          ^
+CMakeCXXCompilerId.cpp:187:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_MINOR DEC(__GNUC_MINOR__)
+           ^
+CMakeCXXCompilerId.cpp:190:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_PATCH DEC(__GNUC_PATCHLEVEL__)
+           ^
+
+
+Compiling the CXX compiler identification source file "CMakeCXXCompilerId.cpp" failed.
+Compiler: /usr/bin/c++ 
+Build flags: 
+Id flags: -c
+
+The output was:
+1
+CMakeCXXCompilerId.cpp:185:10: error: macro names must be identifiers
+ # define .COMPILER_VERSION_MAJOR DEC(__GNUC__)
+          ^
+CMakeCXXCompilerId.cpp:187:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_MINOR DEC(__GNUC_MINOR__)
+           ^
+CMakeCXXCompilerId.cpp:190:11: error: macro names must be identifiers
+ #  define .COMPILER_VERSION_PATCH DEC(__GNUC_PATCHLEVEL__)
+           ^
+
+
+Checking whether the CXX compiler is IAR using "" did not match "IAR .+ Compiler":
+c++: fatal error: no input files
+compilation terminated.

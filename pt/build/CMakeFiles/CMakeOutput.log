@@ -1,0 +1,57 @@
+The system is: Linux - 4.4.0-21-generic - x86_64
+Determining if the C compiler works passed with the following output:
+Change Dir: /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_aa990/fast"
+/usr/bin/make -f CMakeFiles/cmTC_aa990.dir/build.make CMakeFiles/cmTC_aa990.dir/build
+make[1]: Entering directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_aa990.dir/testCCompiler.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_aa990.dir/testCCompiler.c.o   -c /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp/testCCompiler.c
+Linking C executable cmTC_aa990
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_aa990.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_aa990.dir/testCCompiler.c.o  -o cmTC_aa990  
+make[1]: Leaving directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+
+
+Detecting C compiler ABI info compiled with the following output:
+Change Dir: /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_0238f/fast"
+/usr/bin/make -f CMakeFiles/cmTC_0238f.dir/build.make CMakeFiles/cmTC_0238f.dir/build
+make[1]: Entering directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_0238f.dir/CMakeCCompilerABI.c.o
+/usr/bin/cc     -o CMakeFiles/cmTC_0238f.dir/CMakeCCompilerABI.c.o   -c /usr/share/cmake-3.5/Modules/CMakeCCompilerABI.c
+Linking C executable cmTC_0238f
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0238f.dir/link.txt --verbose=1
+/usr/bin/cc       CMakeFiles/cmTC_0238f.dir/CMakeCCompilerABI.c.o  -o cmTC_0238f   
+make[1]: Leaving directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+
+
+Determining if the CXX compiler works passed with the following output:
+Change Dir: /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_92245/fast"
+/usr/bin/make -f CMakeFiles/cmTC_92245.dir/build.make CMakeFiles/cmTC_92245.dir/build
+make[1]: Entering directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_92245.dir/testCXXCompiler.cxx.o
+/usr/bin/c++      -o CMakeFiles/cmTC_92245.dir/testCXXCompiler.cxx.o -c /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp/testCXXCompiler.cxx
+Linking CXX executable cmTC_92245
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_92245.dir/link.txt --verbose=1
+/usr/bin/c++        CMakeFiles/cmTC_92245.dir/testCXXCompiler.cxx.o  -o cmTC_92245  
+make[1]: Leaving directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+
+
+Detecting CXX compiler ABI info compiled with the following output:
+Change Dir: /home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp
+
+Run Build Command:"/usr/bin/make" "cmTC_d31fc/fast"
+/usr/bin/make -f CMakeFiles/cmTC_d31fc.dir/build.make CMakeFiles/cmTC_d31fc.dir/build
+make[1]: Entering directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_d31fc.dir/CMakeCXXCompilerABI.cpp.o
+/usr/bin/c++      -o CMakeFiles/cmTC_d31fc.dir/CMakeCXXCompilerABI.cpp.o -c /usr/share/cmake-3.5/Modules/CMakeCXXCompilerABI.cpp
+Linking CXX executable cmTC_d31fc
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_d31fc.dir/link.txt --verbose=1
+/usr/bin/c++        CMakeFiles/cmTC_d31fc.dir/CMakeCXXCompilerABI.cpp.o  -o cmTC_d31fc   
+make[1]: Leaving directory '/home/wpf/Desktop/ptfuzzer-master/pt/build/CMakeFiles/CMakeTmp'
+
+

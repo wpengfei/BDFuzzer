@@ -1,0 +1,1 @@
+/usr/bin/c++   -std=c++11 -O3 -D_FILE_OFFSET_BITS=64 -g   CMakeFiles/test_disassemble.dir/test_disassemble.cpp.o  -o CMakeFiles/CMakeRelink.dir/test_disassemble  libpt.a -lcapstone 
