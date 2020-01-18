@@ -595,27 +595,45 @@ void my_cofi_map::show_possible_paths(void){
 }
 
 uint64_t my_cofi_map::target_backward_search(uint64_t target){
-    uint64_t node = target;
     std::cout<<"[target_backward_search]target: "<<target<<std::endl;
+
+    assert(target != 0);
+
+    if(cfg[target][0]->in_cur_trace){
+        std::cout<<"[target_backward_search]target in trace"<<std::endl;
+        return 1;
+    }
+    else if(cfg[target].size()>1 && cfg[target][1]->in_cur_trace){
+        std::cout<<"[target_backward_search]target in trace"<<std::endl;
+        return 1;
+    }
+
+    uint64_t node = target;
     while(cfg[node].size()>0){
-        std::cout<<node<<"->";
-        node = cfg[node][0]->prev;
-        if (node == 0){
-            std::cout<<"\n[target_backward_search]finish, connot find trace node"<<std::endl;
-            break;
+        if(cfg[node][0]->in_cur_trace){
+            std::cout<<node<<std::endl;
+            std::cout<<"[target_backward_search]find trace node: "<<node<<std::endl;
+            return node;
+        }
+        else if(cfg[node].size()>1 && cfg[node][1]->in_cur_trace){
+            std::cout<<node<<std::endl;
+            std::cout<<"[target_backward_search]find trace node: "<<node<<std::endl;
+            return node;
         }
         else {
-            if(cfg[node][0]->in_cur_trace){
-                std::cout<<node<<std::endl;
-                std::cout<<"[target_backward_search]find trace node"<<node<<std::endl;
-                break;
-            }
-            else if(cfg[node].size()>1 && cfg[node][1]->in_cur_trace){
-                std::cout<<node<<std::endl;
-                std::cout<<"[target_backward_search]find trace node"<<node<<std::endl;
-                break;
+            std::cout<<node<<"->";
+            back_trace.push_back(node);
+            node = cfg[node][0]->prev;
+            if (node == 0){
+                std::cout<<"\n[target_backward_search]finish, connot find trace node"<<std::endl;
+                return node;
             }
         }
-    }      
+    } 
+    assert(false);   
+}
+
+uint64_t my_cofi_map::score_back_path(uint64_t ret){
+
 
 }

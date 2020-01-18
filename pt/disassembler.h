@@ -142,6 +142,7 @@ class my_cofi_map : public i_cofi_map {
     cofi_inst_t** map_data;
     bb_list_t *bb_ptr, bb_list;
     cfg_t *cfg_ptr, cfg;
+    std::vector<uint64_t> back_trace;
 public:
     my_cofi_map(uint64_t base_address, uint32_t code_size);
     ~my_cofi_map();
@@ -172,6 +173,7 @@ public:
     void print_bb_list(void);
     void show_possible_paths(void);
     uint64_t target_backward_search(uint64_t target);
+    uint64_t score_back_path(uint64_t ret);
 
 };
 
