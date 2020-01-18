@@ -357,7 +357,7 @@ bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
     // add cofi node
     cfg_node_t* node = (cfg_node_t*)malloc(sizeof(cfg_node_t));
     node->is_cofi_node = true;
-    node->in_cur_trace = true;
+    node->in_cur_trace = false;
     node->next = target_addr;
     node->cur_addr = cofi_addr;
     node->count = 0;
@@ -369,7 +369,7 @@ bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
     cfg_node_t* node2 = (cfg_node_t*)malloc(sizeof(cfg_node_t));
     if(cfg.count(target_addr)==0){
         node2->is_cofi_node = false;
-        node2->in_cur_trace = true;
+        node2->in_cur_trace = false;
         node2->next = map_data[target_addr-base_address]->inst_addr;// use cofi_map
         node2->cur_addr = target_addr;
         node2->prev = cofi_addr;
@@ -379,7 +379,7 @@ bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
         e.push_back(node2);
         cfg[target_addr] = e;
         //printf("---------------add %x, target %x, inst %x\n", cofi_addr, target_addr, map_data[target_addr-base_address]->inst_addr);
-
+        //this->mark_trace_node(node2->cur_addr, node2->next);
     }
     else{
         assert(false);
@@ -392,10 +392,17 @@ bool my_cofi_map::mark_trace_node(uint64_t cofi_addr, uint64_t target_addr){
         if (cfg[cofi_addr][i]->next == target_addr){
             cfg[cofi_addr][i]->count++;
             cfg[cofi_addr][i]->in_cur_trace = true;
-            return true;
+            break;
         }
     }
-    return false;
+    //printf("target_addr: %x\n", target_addr);
+    assert(cfg.count(target_addr) == 1);
+    assert(cfg[target_addr][0]->is_cofi_node == false);
+    
+    cfg[target_addr][0]->count++;
+    cfg[target_addr][0]->in_cur_trace = true;
+
+    return true;
 }
 
 bool my_cofi_map::clear_trace_node(uint64_t cofi_addr, uint64_t target_addr){
@@ -584,5 +591,31 @@ void my_cofi_map::show_possible_paths(void){
         
 
     }
-    
+
+}
+
+uint64_t my_cofi_map::target_backward_search(uint64_t target){
+    uint64_t node = target;
+    std::cout<<"[target_backward_search]target: "<<target<<std::endl;
+    while(cfg[node].size()>0){
+        std::cout<<node<<"->";
+        node = cfg[node][0]->prev;
+        if (node == 0){
+            std::cout<<"\n[target_backward_search]finish, connot find trace node"<<std::endl;
+            break;
+        }
+        else {
+            if(cfg[node][0]->in_cur_trace){
+                std::cout<<node<<std::endl;
+                std::cout<<"[target_backward_search]find trace node"<<node<<std::endl;
+                break;
+            }
+            else if(cfg[node].size()>1 && cfg[node][1]->in_cur_trace){
+                std::cout<<node<<std::endl;
+                std::cout<<"[target_backward_search]find trace node"<<node<<std::endl;
+                break;
+            }
+        }
+    }      
+
 }

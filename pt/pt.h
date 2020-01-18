@@ -224,6 +224,8 @@ class pt_packet_decoder{
     uint64_t min_address;
     uint64_t max_address;
     uint64_t app_entry_point;
+    uint64_t target_block;
+
     cofi_map_t& cofi_map;
     bb_list_t* bb_list;
     cfg_t* cfg;
@@ -251,6 +253,7 @@ class pt_packet_decoder{
 
 public:
     uint64_t num_decoded_branch = 0;
+    
 
 public:
     pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_aux, pt_fuzzer* fuzzer);
@@ -289,7 +292,7 @@ private:
             cofi_map.mark_trace_node(this->last_target0, tip);
             control_flows.push_back(this->last_target0);
             control_flows.push_back(tip);
-            std::cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
+            //std::cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
 
             this->last_target0 = 0;
         }
@@ -319,7 +322,7 @@ private:
             cofi_map.mark_trace_node(this->last_target0, tip);
             control_flows.push_back(this->last_target0);
             control_flows.push_back(tip);
-            std::cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
+            //std::cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
 
             this->last_target0 = 0;
         }
@@ -468,6 +471,7 @@ class pt_fuzzer {
     uint64_t base_address;
     uint64_t max_address;
     uint64_t entry_point;
+    uint64_t target_addr;
 
     int32_t perfIntelPtPerfType = -1;
     cofi_map_t cofi_map;
@@ -481,10 +485,11 @@ class pt_fuzzer {
     uint64_t num_runs = 0;
 
 public:
-    pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point);
+    pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr);
     void init();
     void start_pt_trace(int pid);
     void stop_pt_trace(uint8_t *trace_bits);
+    uint64_t get_target(void){return target_addr;}
     pt_packet_decoder* debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode=TNT_MODE);
     std::chrono::time_point<std::chrono::steady_clock> start;
     std::chrono::time_point<std::chrono::steady_clock> end;

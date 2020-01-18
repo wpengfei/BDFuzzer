@@ -150,13 +150,13 @@ fuzzer_config& get_fuzzer_config() {
     return config;
 }
 
-pt_fuzzer::pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point) :
+pt_fuzzer::pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr) :
 	        raw_binary_file(raw_binary_file), base_address(base_address), max_address(max_address), entry_point(entry_point),
-	        code(nullptr) , trace(nullptr), cofi_map(base_address, max_address-base_address) {
-#ifdef DEBUG
+	        target_addr(target_addr), code(nullptr) , trace(nullptr), cofi_map(base_address, max_address-base_address) {
+//#ifdef DEBUG
     std::cout << "init pt fuzzer: raw_binary_file = " << raw_binary_file << ", min_address = " << base_address
-            << ", max_address = " << max_address << ", entry_point = " << entry_point << std::endl;
-#endif
+            << ", max_address = " << max_address << ", entry_point = " << entry_point <<", target_addr = "<<target_addr<< std::endl;
+//#endif
 
 }
 
@@ -237,7 +237,7 @@ bool pt_fuzzer::build_cofi_map() {
     cofi_map.construct_cfg();
     //cofi_map.print_cfg();
     printf("----------paths\n");
-    cofi_map.show_possible_paths();
+    //cofi_map.show_possible_paths();
 
     bb_list = cofi_map.get_bb_list();
     cfg = cofi_map.get_cfg();
@@ -395,6 +395,7 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
     decoder.decode(get_fuzzer_config().branch_mode);
     this->cofi_map.print_bb_list();
     this->cofi_map.print_cfg();
+    this->cofi_map.target_backward_search(this->target_addr);
 
 //#ifdef DEBUG
     std::cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << std::endl;
@@ -580,7 +581,8 @@ pt_packet_decoder::pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_a
                         cofi_map(fuzzer->get_cofi_map()),
                         min_address(fuzzer->get_base_address()),
                         max_address(fuzzer->get_max_address()),
-                        app_entry_point(fuzzer->get_entry_point()) {
+                        app_entry_point(fuzzer->get_entry_point())
+                        {
     struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)perf_pt_header;
     aux_tail = ATOMIC_GET(pem->aux_tail);
     aux_head = ATOMIC_GET(pem->aux_head);
@@ -589,6 +591,8 @@ pt_packet_decoder::pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_a
     tnt_cache_state = tnt_cache_init();
     cfg = cofi_map.get_cfg();
     bb_list = cofi_map.get_bb_list();
+    target_block = fuzzer->get_target();
+    
 
 
 
@@ -737,7 +741,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                         cofi_map.mark_trace_node(cofi_obj->inst_addr, cofi_obj->target_addr);
                         control_flows.push_back(cofi_obj->inst_addr);
                         control_flows.push_back(cofi_obj->target_addr);
-                        std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
+                        //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
 
                         cofi_obj = get_cofi_obj(cofi_obj->target_addr);
                     }
@@ -752,7 +756,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     cofi_map.mark_trace_node(cofi_obj->inst_addr, next_bb_addr);
                     control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(next_bb_addr);
-                    std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< std::hex <<RESET<< std::endl;
+                    //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< std::hex <<RESET<< std::endl;
                     cofi_obj = cofi_obj->next_cofi;
 
                     break;
@@ -774,7 +778,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     cofi_map.mark_trace_node(cofi_obj->inst_addr, cofi_obj->target_addr);
                     control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(cofi_obj->target_addr);
-                    std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
+                    //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
                     cofi_obj = get_cofi_obj(cofi_obj->target_addr);
                 }
                 break;
@@ -1118,16 +1122,16 @@ void pt_packet_decoder::flush(){
 
 extern "C" {
 pt_fuzzer* the_fuzzer;
-void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point){
+void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point, uint64_t target_addr){
     if(raw_bin_file == nullptr) {
         std::cerr << "raw binary file not set." << std::endl;
         exit(-1);
     }
-    if(min_addr == 0 || max_addr == 0 || entry_point == 0) {
-        std::cerr << "min_addr, max_addr or entry_point not set." << std::endl;
+    if(min_addr == 0 || max_addr == 0 || entry_point == 0 || target_addr == 0) {
+        std::cerr << "min_addr, max_addr, entry_point or target_addr not set." << std::endl;
         exit(-1);
     }
-    the_fuzzer = new pt_fuzzer(raw_bin_file, min_addr, max_addr, entry_point);
+    the_fuzzer = new pt_fuzzer(raw_bin_file, min_addr, max_addr, entry_point, target_addr);
     the_fuzzer->init();
 }
 void start_pt_fuzzer(int pid){

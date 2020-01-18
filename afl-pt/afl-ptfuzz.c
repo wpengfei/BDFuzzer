@@ -8117,7 +8117,8 @@ int main(int argc, char** argv) {
 
   //initial perf
   printf("init pt fuzzer.\n");
-  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point);
+  uint64_t target_addr = 0x40063d;
+  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
 /*
   if(perf_init() == false)
   {

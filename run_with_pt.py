@@ -93,13 +93,16 @@ if __name__ == '__main__':
     
     
     info = binary_loaded_info(app_bin)
+
+    target_addr = 0x4006a4;
     
     print "calculated real program base: ", hex(info['base'])
     print "calculated real program entry: ", hex(info['entry'])
     print "calculated real text_min: ", hex(info['text_min'])
     print "calculated real text_max: ", hex(info['text_max'])
+    print "set target_addr: ", hex(target_addr)
     
-    cmdline = "sudo %s %s 0x%x 0x%x 0x%x %s" % (afl_bin, info['raw_bin'], info['text_min'], info['text_max'], info['entry'], cmdline)
+    cmdline = "sudo %s %s 0x%x 0x%x 0x%x 0x%x %s" % (afl_bin, info['raw_bin'], info['text_min'], info['text_max'], info['entry'], target_addr, cmdline)
     print "cmdline:", cmdline
     os.system(cmdline)
 

@@ -171,6 +171,7 @@ public:
     void print_cfg(void);
     void print_bb_list(void);
     void show_possible_paths(void);
+    uint64_t target_backward_search(uint64_t target);
 
 };
 

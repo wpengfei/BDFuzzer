@@ -20,6 +20,7 @@ void* decoder_thread(void* p)
         i++;
         
     }
+    sleep(1);           
     std::cout << "pt opened! and execution finished! start to decode  "<<i <<std::endl;
     pt_fuzzer* s = (pt_fuzzer*)p;
     s->stop_pt_trace(a);
@@ -28,20 +29,22 @@ void* decoder_thread(void* p)
 int main(int argc, char** argv)
 {
     std::cout << "Enter cpp==> "<< std::endl;
-    if(argc <= 5) {
-        std::cout << argv[0] << " <raw_bin> <min_addr> <max_addr> <entry_point> <cmd_line>" << std::endl;
+    if(argc <= 6) {
+        std::cout << argv[0] << " <raw_bin> <min_addr> <max_addr> <entry_point> <target_addr> <cmd_line>" << std::endl;
         exit(0);
     }
     char* raw_bin = argv[1];
     uint64_t min_addr = strtoul(argv[2], nullptr, 0);
     uint64_t max_addr = strtoul(argv[3], nullptr, 0);
     uint64_t entry_point = strtoul(argv[4], nullptr, 0);
+    uint64_t target_addr = strtoul(argv[5], nullptr, 0);
 
-    char* app_name = argv[5];
-    char** cmd_line = argv + 5;
+    //printf("");
+    char* app_name = argv[6];
+    char** cmd_line = argv + 6;
     std::cout << "application is: " << app_name << std::endl;
     std::cout << "command line: ";
-    int num_args = argc - 5;
+    int num_args = argc - 6;
     char** args = new char*[num_args + 1]; //null pointer
     int i = 0;
     for(i = 0; i < num_args; i ++) {
@@ -51,7 +54,7 @@ int main(int argc, char** argv)
     args[i] = nullptr;
     std::cout << std::endl;
 
-    pt_fuzzer fuzzer(raw_bin, min_addr, max_addr, entry_point);
+    pt_fuzzer fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
     fuzzer.init();
 
     pid_t pid;        //进程标识符

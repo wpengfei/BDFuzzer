@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 extern "C"{
 #endif
-void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point);
+void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point, uint64_t target_addr);
 void start_pt_fuzzer(int pid);
 void stop_pt_fuzzer(uint8_t *trace_bits);
 
