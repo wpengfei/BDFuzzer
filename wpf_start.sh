@@ -8,7 +8,7 @@ cmake ../ -DPREFIX=. -DBUILD_TYPE="Release"
 make
 make install 
 
-#python ./bin/ptfuzzer.py  "-i ../test/input -o ../test/output" "../test/crasher"
+#python ./bin/ptfuzzer.py  "-i ../test/input/ -o ../test/output" "../test/a.out"
 
 python ./bin/run_with_pt.py ../test/a.out file
 

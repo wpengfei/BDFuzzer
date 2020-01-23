@@ -23,6 +23,7 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <string.h>
 #include "disassembler.h"
+#include <algorithm>
 #define LOOKUP_TABLES           5
 #define IGN_MOD_RM                      0
 #define IGN_OPODE_PREFIX        0
@@ -354,6 +355,19 @@ bool my_cofi_map::update_bb_list(uint64_t cofi_addr, uint64_t target_addr){
 //}
 
 bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
+    assert(cfg.count(cofi_addr)==1);
+    //update count
+    if(cfg[cofi_addr].size() >= 1 && cfg[cofi_addr][0]->next == target_addr){
+        assert(cfg.count(target_addr)==1);
+        cfg[target_addr][0]->count++;
+        return true;
+    }
+    else if(cfg[cofi_addr].size() == 2 && cfg[cofi_addr][1]->next == target_addr){
+        assert(cfg.count(target_addr)==1);
+        cfg[target_addr][0]->count++;
+        return true;
+    }
+
     // add cofi node
     cfg_node_t* node = (cfg_node_t*)malloc(sizeof(cfg_node_t));
     node->is_cofi_node = true;
@@ -362,7 +376,6 @@ bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
     node->cur_addr = cofi_addr;
     node->count = 0;
     node->visit = 0;
-    assert(cfg.count(cofi_addr)==1);
     cfg[cofi_addr].push_back(node);
 
     //add target node
@@ -381,7 +394,7 @@ bool my_cofi_map::update_cfg(uint64_t cofi_addr, uint64_t target_addr){
         //printf("---------------add %x, target %x, inst %x\n", cofi_addr, target_addr, map_data[target_addr-base_address]->inst_addr);
         //this->mark_trace_node(node2->cur_addr, node2->next);
     }
-    else{
+    else{//already added this node by last testcase
         assert(false);
     }
     
@@ -626,7 +639,7 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target){
             node = cfg[node][0]->prev;
             if (node == 0){
                 std::cout<<"\n[target_backward_search]finish, connot find trace node"<<std::endl;
-                return node;
+                return 0;
             }
         }
     } 
@@ -634,6 +647,50 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target){
 }
 
 uint64_t my_cofi_map::score_back_path(uint64_t ret){
-
-
+    
+    uint64_t n = this->back_trace.size();
+    std::reverse(this->back_trace.begin(), this->back_trace.end());
+    for (uint64_t i=0; i<n; i++)
+        std::cout<<this->back_trace[i]<<"->";
+    std::cout<<std::endl;
+    assert(n > 0);
+    uint64_t i = 0;
+    uint64_t cur_node;
+    double cur_p;
+    uint64_t c1, c2;
+    while(i+1 < n){
+        cur_node = this->back_trace[i];
+        if(cfg[cur_node][0]->is_cofi_node == false ){
+            assert(cfg[cur_node][0]->next == this->back_trace[i+1]);
+            i = i+1;
+            cur_p = 1;
+        }
+        else{
+            if(cfg[cur_node].size() == 2){
+                c1 = cfg[cur_node][0]->count;
+                c2 = cfg[cur_node][1]->count;
+                if(c1 == 0 && c2 == 0 )
+                    cur_p = 0.5;
+                else{
+                    if (cfg[cur_node][0]->next == this->back_trace[i+1])
+                        cur_p = c1/(c1+c2);
+                    else{
+                        assert(cfg[cur_node][1]->next == this->back_trace[i+1]);
+                        cur_p = c2/(c1+c2);
+                    }
+                }
+            }
+            else{
+                assert(cfg[cur_node].size() == 1);
+                cur_p = 1;
+            }
+            i = i + 1;
+        }
+        if(cfg[cur_node][0]->is_cofi_node)
+            printf("[cofi]cur_node: %x -> %x, possibility %f\n", cur_node, this->back_trace[i], cur_p);        
+        else
+            printf("[----]cur_node: %x -> %x, possibility %f\n", cur_node, this->back_trace[i], cur_p);
+    }
+    assert(i == n-1);
+    
 }

@@ -267,15 +267,15 @@ private:
     inline void tip_handler(uint8_t** p, uint8_t** end){
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
-//#ifdef DEBUG
+#ifdef DEBUG
             std::cout << "[tip_handler]enter program entry point" << std::endl;
-//#endif
+#endif
             this->start_decode = true;
         }
 
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_target0<<" tip: " << std::hex << tip <<RESET<< std::endl;
-//#endif
+#endif
         assert(this->pge_enabled);
         if(this->branch_info_mode == TNT_MODE) {
             decode_tnt(this->last_tip);
@@ -302,16 +302,16 @@ private:
         this->pge_enabled = true;
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
-//#ifdef DEBUG
+#ifdef DEBUG
             std::cout << "[tip_pge_handler]enter program entry point" << std::endl;
-//#endif
+#endif
             this->start_decode = true;
         }
 
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout <<BOLDYELLOW<< "[tip_pge_handler]cofi:"<<this->last_target0<<" tip: " << std::hex << tip <<RESET<< std::endl;
 
-//#endif
+#endif
         assert(this->last_tip == 0);
         this->last_tip = tip;
 
@@ -333,15 +333,15 @@ private:
         this->pge_enabled = false;
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
-//#ifdef DEBUG
+#ifdef DEBUG
             std::cout << "[tip_pgd_handler]enter program entry point" << std::endl;
-//#endif
+#endif
             this->start_decode = true;
         }
 
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[tip_pgd_handler]tip_pgd: " << std::hex << tip <<RESET<< std::endl;
-//#endif
+#endif
 
         if(this->branch_info_mode == TNT_MODE) {
             decode_tnt(this->last_tip);
@@ -353,18 +353,18 @@ private:
     /*handler the fup packets.*/
     inline void tip_fup_handler(uint8_t** p, uint8_t** end){
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[tip_fup_handler]tip_fup: " << std::hex << tip <<RESET << std::endl;
-//#endif
+#endif
         //just change the state
         if (this->last_tip == 0)
             this->last_tip = tip;
     }
 
     inline void psb_handler(uint8_t** p){
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[psb_handler]psb packet: " << (uint64_t)(**p)<< std::endl;
-//#endif
+#endif
         if(this->branch_info_mode == TNT_MODE) {
             decode_tnt(this->last_tip);
         }
@@ -379,34 +379,34 @@ private:
 
     inline void tnt8_handler(uint8_t** p){
         //uint64_t old_count = count_tnt(tnt_cache_state);
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[tnt8_handler]tnt8: " << tnt_to_string(true, (uint64_t)(**p)) << std::endl;
-//#endif
+#endif
 
         assert(this->pge_enabled);
         if(this->branch_info_mode == TNT_MODE || this->branch_info_mode == FAKE_TNT_MODE) {
             append_tnt_cache(tnt_cache_state, true, (uint64_t)(**p));
         }
-//#ifdef DEBUG
+#ifdef DEBUG
         //print_tnt(tnt_cache_state);
         std::cout << "[tnt8_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
         //tnt_cache_destroy(tnt_cache);
-//#endif
+#endif
         (*p)++;
     }
 
     inline void long_tnt_handler(uint8_t** p){
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[long_tnt_handler]long_tnt: " << tnt_to_string(false, (uint64_t)(**p)) << std::endl;;
-//#endif
+#endif
 
         assert(this->pge_enabled);
         if(this->branch_info_mode == TNT_MODE || this->branch_info_mode == FAKE_TNT_MODE) {
             append_tnt_cache(tnt_cache_state, false, (uint64_t)*p);
         }
-//#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "[long_tnt_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
-//#endif
+#endif
         (*p) += PT_PKT_LTNT_LEN;
     }
 
