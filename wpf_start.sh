@@ -4,7 +4,7 @@ rm -r build
 mkdir build
 cd build
 #make clean
-cmake ../ -DPREFIX=. -DBUILD_TYPE="Release"
+cmake ../ -DPREFIX=. -DBUILD_TYPE="Debug"
 make
 make install 
 

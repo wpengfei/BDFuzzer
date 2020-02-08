@@ -228,21 +228,20 @@ bool pt_fuzzer::build_cofi_map() {
     std::cout << "[pt_fuzzer::build_cofi_map]cofi map complete percentage: " << cofi_map.complete_percentage() << "\%" << std::endl;
     //std::cout << "first addr = " << cofi_map.begin()->first << std::endl;
     //std::cout << "last addr = " << (cofi_map.rbegin())->first << std::endl;
-    cofi_map.construct_bb_list();
-    cofi_map.construct_cfg();
+    //
+    //cofi_map.construct_cfg();
 #ifdef DEBUG
     printf("----------cofi_map\n");
     //cofi_map.print_map_data();
     printf("----------bb_list\n");
+    cofi_map.construct_bb_list();
     //cofi_map.print_bb_list();
-    printf("----------cfg\n");
-    //cofi_map.print_cfg();
-    //printf("----------possible paths\n");
-    //cofi_map.show_possible_paths();
-#endif  
+    printf("----------edge_map\n");
+    cofi_map.construct_edge_map();
+    cofi_map.print_edge_map(0);
 
-    bb_list = cofi_map.get_bb_list();
-    cfg = cofi_map.get_cfg();
+
+#endif  
 
     return true;
 }
@@ -320,87 +319,21 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
     std::cout << "[pt_fuzzer::stop_pt_trace]stop pt trace OK." << std::endl;
 #endif
 
-/*
-    struct perf_event_mmap_page* pem; 
-    uint8_t aux_tail; 
-    uint8_t aux_head;
-    uint64_t i =0;
-    pem = (struct perf_event_mmap_page*)(trace->get_perf_pt_header());
-    aux_tail = ATOMIC_GET(pem->aux_tail);
-    aux_head = ATOMIC_GET(pem->aux_head);
 
-    while(aux_tail == 0 && aux_head == 0){
-        usleep(1);
-        i++;
-        
-        pem = (struct perf_event_mmap_page*)(trace->get_perf_pt_header());
-        aux_tail = ATOMIC_GET(pem->aux_tail);
-        aux_head = ATOMIC_GET(pem->aux_head);
-    }
-*/
 
-    struct perf_event_mmap_page* pem; 
-    uint64_t aux_tail, aux_tail0; 
-    uint64_t aux_head, aux_head0;
-    uint8_t* pt_pkt;
-    uint64_t i = 0;
-    //aux_tail0 = 0;
-    //aux_head0 = 0;
-    //std::cout << "[pt_fuzzer::stop_pt_trace]pem = "<<std::hex<<pem<<",aux_tail0="<<std::hex<<aux_tail0<<",aux_head0="<<std::hex<<aux_head0<< std::endl;
-    //
-    //usleep(1000000);
-    //while(i<100){
-    pem = (struct perf_event_mmap_page*)(trace->get_perf_pt_header());
-    //pt_pkt = trace->get_perf_pt_aux();
-    aux_tail0 = ATOMIC_GET(pem->aux_tail);
-    aux_head0 = ATOMIC_GET(pem->aux_head);
-    std::cout << "[pt_fuzzer::stop_pt_trace]pem = "<<std::hex<<pem
-        <<",pt_pkt="<<(uint64_t)(trace->get_perf_pt_aux())
-        <<",aux_head0="<<std::hex<<aux_head0
-        <<",aux_tail0="<<std::hex<<aux_tail0
-        << std::endl;
-        i++;
-    //usleep(10000);}
-    
-/*
-    while(aux_tail0 == NULL || aux_head0 == NULL){
-        usleep(100);
-        pem = (struct perf_event_mmap_page*)(trace->get_perf_pt_header());
-        aux_tail0 = ATOMIC_GET(pem->aux_tail);
-        aux_head0 = ATOMIC_GET(pem->aux_head);
-        std::cout << "[pt_fuzzer::stop_pt_trace]aux_tail0="<<aux_tail0<<",aux_head0="<<aux_head0<< std::endl;
- 
-        std::cout << "[pt_fuzzer::stop_pt_trace]  NULL "<<std::endl;
-    }
-    std::cout << "[pt_fuzzer::stop_pt_trace]  not NULL "<<std::endl;
-    int c=0;
-    while (1){
-        usleep(1000);
-        pem = (struct perf_event_mmap_page*)(trace->get_perf_pt_header());
-        aux_tail = ATOMIC_GET(pem->aux_tail);
-        aux_head = ATOMIC_GET(pem->aux_head);
-        c++;
-        if(aux_tail != aux_tail0 || aux_head != aux_head0){
-            aux_tail0 = aux_tail;
-            aux_head0 = aux_head;
-            std::cout << "[pt_fuzzer::stop_pt_trace]pem = "<<std::hex<<pem<<",aux_tail0="<<std::hex<<aux_tail0<<",aux_head0="<<std::hex<<aux_head0<< std::endl;
-        }
-        if (c>1000)
-            break;
-    }
-    */
-    //std::cout << "[pt_packet_decoder::decode]wait for pt data:" <<i<< std::endl;
     std::cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< std::endl;
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
     decoder.decode(get_fuzzer_config().branch_mode);
-#ifdef DEBUG  
-    this->cofi_map.print_bb_list();
+
+    this->cofi_map.print_edge_map(0);
+    this->cofi_map.mark_trace_node(decoder.control_flows);
+    this->cofi_map.update_edge_count(decoder.control_flows);
     
-#endif
-    this->cofi_map.print_cfg();
     this->cofi_map.target_backward_search(this->target_addr);
-    this->cofi_map.score_back_path(0);
+
+    this->cofi_map.clear_trace_node();
+
 
 #ifdef DEBUG
     std::cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << std::endl;
@@ -594,8 +527,8 @@ pt_packet_decoder::pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_a
     trace_bits = (uint8_t*)malloc(MAP_SIZE * sizeof(uint8_t));
     memset(trace_bits, 0, MAP_SIZE);
     tnt_cache_state = tnt_cache_init();
-    cfg = cofi_map.get_cfg();
-    bb_list = cofi_map.get_bb_list();
+    //cfg = cofi_map.get_cfg();
+    //bb_list = cofi_map.get_bb_list();
     target_block = fuzzer->get_target();
     
 
@@ -745,9 +678,16 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     }
                     else{
                         assert(cofi_obj->target_addr != 0);
-                        cofi_map.mark_trace_node(cofi_obj->inst_addr, cofi_obj->target_addr);
-                        control_flows.push_back(cofi_obj->inst_addr);
-                        control_flows.push_back(cofi_obj->target_addr);
+
+                        uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
+                        
+                        if (control_flows.size()==0)
+                            control_flows.push_back(cofi_obj->inst_addr);
+                        control_flows.push_back(target_cofi);
+                        
+
+                        
+                        
                         //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
 
                         cofi_obj = get_cofi_obj(cofi_obj->target_addr);
@@ -759,10 +699,13 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                     std::cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << std::hex <<cofi_obj->inst_addr << " NOT_TAKEN, next = " << cofi_obj->next_cofi->inst_addr <<RESET<< std::endl;
 #endif            
-                    uint64_t next_bb_addr = cofi_obj->next_cofi->bb_start_addr;
-                    cofi_map.mark_trace_node(cofi_obj->inst_addr, next_bb_addr);
-                    control_flows.push_back(cofi_obj->inst_addr);
-                    control_flows.push_back(next_bb_addr);
+                    uint64_t next_cofi = cofi_obj->next_cofi->inst_addr;
+                    
+                    if (control_flows.size()==0)
+                        control_flows.push_back(cofi_obj->inst_addr);
+                    control_flows.push_back(next_cofi);
+                    
+
                     //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< std::hex <<RESET<< std::endl;
                     cofi_obj = cofi_obj->next_cofi;
 
@@ -778,15 +721,20 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                     std::cout <<BOLDYELLOW<< "Target: "<<cofi_obj->target_addr<<" Out of bounds, change to 0!" << std::hex <<RESET<< std::endl;
 #endif
-                    last_target0 = cofi_obj->inst_addr;
+                    last_target0 = cofi_obj->inst_addr;// last cofi whose target it is 0
                     cofi_obj->target_addr = 0;
                     cofi_obj = nullptr;
                 }
                 else{
                     assert(cofi_obj->target_addr != 0);
-                    cofi_map.mark_trace_node(cofi_obj->inst_addr, cofi_obj->target_addr);
-                    control_flows.push_back(cofi_obj->inst_addr);
-                    control_flows.push_back(cofi_obj->target_addr);
+
+                    uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
+                    
+                    if (control_flows.size()==0)
+                        control_flows.push_back(cofi_obj->inst_addr);
+                    control_flows.push_back(target_cofi);
+                    
+
                     //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
                     cofi_obj = get_cofi_obj(cofi_obj->target_addr);
                 }
@@ -857,6 +805,7 @@ uint32_t pt_packet_decoder::decode_fake_tnt(uint64_t entry_point){
             alter_bitmap(bb);
             bb_count ++;
         }
+
     }
     return bb_count;
 }

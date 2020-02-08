@@ -244,7 +244,7 @@ class pt_packet_decoder{
     uint8_t* pt_packets;
 
 
-    uint64_t bitmap_last_ip = 0; // >>1
+    uint64_t bitmap_last_cofi = 0; // >>1
     uint8_t* trace_bits;
 
     branch_info_mode_t branch_info_mode = TNT_MODE;
@@ -253,6 +253,7 @@ class pt_packet_decoder{
 
 public:
     uint64_t num_decoded_branch = 0;
+    std::vector<uint64_t> control_flows;
     
 
 public:
@@ -287,11 +288,16 @@ private:
         this->last_tip = tip;
 
         if(this->last_target0!=0){
-            cofi_map.update_bb_list(this->last_target0, tip);
-            cofi_map.update_cfg(this->last_target0, tip);
-            cofi_map.mark_trace_node(this->last_target0, tip);
-            control_flows.push_back(this->last_target0);
-            control_flows.push_back(tip);
+            //cofi_map.update_bb_list(this->last_target0, tip);
+            uint64_t last_cofi = cofi_map.get_cofi_addr(last_target0);
+            uint64_t cofi = cofi_map.get_cofi_addr(tip);
+
+            cofi_map.add_edge(last_cofi, cofi);
+            
+            if (control_flows.size()==0)
+                control_flows.push_back(last_cofi);
+            control_flows.push_back(cofi);
+            
             //std::cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
 
             this->last_target0 = 0;
@@ -317,11 +323,15 @@ private:
 
         //assert(this->last_target0!=0);
         if(this->last_target0!=0){
-            cofi_map.update_bb_list(this->last_target0, tip);
-            cofi_map.update_cfg(this->last_target0, tip);
-            cofi_map.mark_trace_node(this->last_target0, tip);
-            control_flows.push_back(this->last_target0);
-            control_flows.push_back(tip);
+            uint64_t last_cofi = cofi_map.get_cofi_addr(last_target0);
+            uint64_t cofi = cofi_map.get_cofi_addr(tip);
+
+            cofi_map.add_edge(last_cofi, cofi);
+            
+            if (control_flows.size()==0)
+                control_flows.push_back(last_cofi);
+            control_flows.push_back(cofi);
+            
             //std::cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
 
             this->last_target0 = 0;
@@ -421,30 +431,23 @@ private:
     uint32_t decode_tnt(uint64_t entry_point); // for TNT mode only
     uint32_t decode_fake_tnt(uint64_t entry_point); // for FAKE_TNT mode only
     void decode_tip(uint64_t tip); // for TIP mode only
-    inline void alter_bitmap(uint64_t addr) {
-        //#if 0
+    inline void alter_bitmap(uint64_t cur_cofi) {
 
-        //control_flows.push_back(addr);
+        //control_flows.push_back(cur_cofi);
 
-        //std::cout << GREEN<< "[alter_bitmap]real_last_ip=> " << real_last_ip<<" addr=>" <<addr<< RESET<< std::endl;
-
-        uint16_t last_ip16, addr16, pos16;
-        last_ip16 = (uint16_t)(bitmap_last_ip);
-        addr16 = (uint16_t)(addr);
-        pos16 = (uint16_t)(last_ip16 ^ addr16);
-        trace_bits[pos16]++;
-        bitmap_last_ip = addr >> 1;
-        //#endif
-        //trace_bits[addr & 0xffff] ++;
-        //if(tracing_flag)
-            
+        if(bitmap_last_cofi == 0){
+            bitmap_last_cofi = cur_cofi;
+        }
+        else{
+            uint16_t pos16 = (uint16_t)cofi_map.get_edge_id(bitmap_last_cofi, cur_cofi);
+            trace_bits[pos16]++;
+            bitmap_last_cofi = cur_cofi;
+        }
 
     }
 protected:
     cofi_inst_t* get_cofi_obj(uint64_t addr);
-
-private:
-    std::vector<uint64_t> control_flows;
+    
 public:
     void dump_control_flows(FILE* f);
 };
@@ -475,8 +478,6 @@ class pt_fuzzer {
 
     int32_t perfIntelPtPerfType = -1;
     cofi_map_t cofi_map;
-    bb_list_t* bb_list;
-    cfg_t* cfg;
 
     uint8_t* code;
 
