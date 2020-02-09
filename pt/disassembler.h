@@ -98,8 +98,7 @@ typedef struct _basic_block_t {
 } basic_block_t;
 
 typedef struct _edge_t {
-    bool valid; // is this edge valid?
-    //bool in_path; // is this node in current execution path?
+    bool valid; // is this edge valid in the edge_map?
     uint64_t id; // unique ID used as hash value
     uint64_t from;
     uint64_t to;
@@ -107,18 +106,6 @@ typedef struct _edge_t {
 } edge_t;
 
 
-typedef struct _cfg_node_t {
-    bool is_cofi_node; //cofi_node can have two edges, none_cofi_node only has the next addr.
-    bool in_cur_trace; // this node is in current execution trace.
-    uint64_t cur_addr;
-    uint64_t next;
-    uint64_t prev;
-    uint64_t count; // how many times this edge is executed.
-    uint64_t visit;
-} cfg_node_t;
-
-typedef std::vector<cfg_node_t*> edges;
-typedef std::map<uint64_t, edges> cfg_t;
 
 typedef std::map<uint64_t, basic_block_t*> bb_list_t;
 
@@ -150,8 +137,7 @@ public:
 class my_cofi_map : public i_cofi_map {
     cofi_inst_t** map_data;
     bb_list_t *bb_ptr, bb_list;
-    cfg_t *cfg_ptr, cfg;
-    std::vector<uint64_t> back_trace;
+
     uint64_t bbnum;
     uint64_t unique_id;
     std::map<uint64_t, uint64_t> addr_to_idx; // covert the addr to an index in the edge_map 
@@ -246,7 +232,6 @@ public:
 
 };
 
-//typedef std::map<uint64_t, cofi_inst_t*> cofi_map_t;
 typedef my_cofi_map cofi_map_t;
 uint32_t disassemble_binary(const uint8_t* code, uint64_t base_address, uint64_t& code_size, cofi_map_t& cofi_map);
 #endif

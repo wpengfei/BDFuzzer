@@ -13,7 +13,7 @@
 #define ATOMIC_POST_OR_RELAXED(x, y) __atomic_fetch_or(&(x), y, __ATOMIC_RELAXED)
 #define ATOMIC_GET(x) __atomic_load_n(&(x), __ATOMIC_SEQ_CST)
 #define ATOMIC_SET(x, y) __atomic_store_n(&(x), y, __ATOMIC_SEQ_CST)
-bool perf_support_ip_filter = true; //assume platform support ip filter in perf
+
 
 extern bool begin_tracing ;
 extern bool finished_decoding ;
@@ -26,45 +26,6 @@ static uint8_t psb[16] = {
         0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82
 };
 
-static long perf_event_open(
-        struct perf_event_attr* hw_event, pid_t pid, int cpu, int group_fd, unsigned long flags) {
-    return syscall(__NR_perf_event_open, hw_event, (uintptr_t)pid, (uintptr_t)cpu,
-            (uintptr_t)group_fd, (uintptr_t)flags);
-}
-
-ssize_t files_readFromFd(int fd, uint8_t* buf, size_t fileSz) {
-    size_t readSz = 0;
-    while (readSz < fileSz) {
-        ssize_t sz = read(fd, &buf[readSz], fileSz - readSz);
-        if (sz < 0 && errno == EINTR) continue;
-
-        if (sz == 0) break;
-
-        if (sz < 0) return -1;
-
-        readSz += sz;
-    }
-    return (ssize_t)readSz;
-}
-
-static ssize_t files_readFileToBufMax(char* fileName, uint8_t* buf, size_t fileMaxSz) {
-    int fd = open(fileName, O_RDONLY | O_CLOEXEC);
-    if (fd == -1) {
-        perror("ERROR: ");
-        printf("Couldn't open '%s' for R/O\n", fileName);
-        return -1;
-    }
-
-    ssize_t readSz = files_readFromFd(fd, buf, fileMaxSz);
-    if (readSz < 0) {
-        perror("ERROR: ");
-        printf("Couldn't read '%s' to a buf\n", fileName);
-    }
-    close(fd);
-
-    //printf("Read '%zu' bytes from '%s'\n", readSz, fileName);
-    return readSz;
-}
 
 
 void load_config_file(std::map<std::string, std::string>& config_kvs) {
@@ -103,39 +64,6 @@ void fuzzer_config::load_config() {
     std::map<std::string, std::string> config_kvs;
     load_config_file(config_kvs);
 
-    std::string branch_mode = config_kvs["BRANCH_MODE"];
-    if(branch_mode != "") {
-        if(branch_mode == "TIP_MODE") {
-            this->branch_mode = TIP_MODE;
-        }
-        else if(branch_mode == "TNT_MODE") {
-            this->branch_mode = TNT_MODE;
-        }
-        else if(branch_mode == "FAKE_TNT_MODE") {
-            this->branch_mode = FAKE_TNT_MODE;
-        }
-        else {
-            std::cerr << "config BRANCH_MODE(" << branch_mode << ") env error, ignore it." << std::endl;
-        }
-    }
-    else {
-        std::cerr << "BRANCH_MODE is null, using default TNT mode." << std::endl;
-    }
-    switch(this->branch_mode) {
-    case TIP_MODE:
-        std::cout << "Run ptfuzzer with TIP_MODE" << std::endl;
-        break;
-    case TNT_MODE:
-        std::cout << "Run ptfuzzer with TNT_MODE" << std::endl;
-        break;
-    case FAKE_TNT_MODE:
-        std::cout << "Run ptfuzzer with FAKE_TNT_MODE." << std::endl;
-        break;
-    default:
-        std::cerr << "unkown branch mode." << std::endl;
-        assert(false);
-    }
-
     // load aux buffer size
     std::string config_aux_buffer_size = config_kvs["PERF_AUX_BUFFER_SIZE"];
     if(config_aux_buffer_size != "") {
@@ -150,367 +78,6 @@ fuzzer_config& get_fuzzer_config() {
     return config;
 }
 
-pt_fuzzer::pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr) :
-	        raw_binary_file(raw_binary_file), base_address(base_address), max_address(max_address), entry_point(entry_point),
-	        target_addr(target_addr), code(nullptr) , trace(nullptr), cofi_map(base_address, max_address-base_address) {
-#ifdef DEBUG
-    std::cout << "init pt fuzzer: raw_binary_file = " << raw_binary_file << ", min_address = " << base_address
-            << ", max_address = " << max_address << ", entry_point = " << entry_point <<", target_addr = "<<target_addr<< std::endl;
-#endif
-
-}
-
-bool pt_fuzzer::config_pt() {
-    uint8_t buf[PATH_MAX + 1];
-    ssize_t sz = files_readFileToBufMax("/sys/bus/event_source/devices/intel_pt/type", buf, sizeof(buf) - 1);
-    if (sz <= 0) {
-        std::cerr << "intel processor trace is not supported on this platform." << std::endl;
-        //exit(-1);
-        return false;
-    }
-
-
-    buf[sz] = '\0';
-    perfIntelPtPerfType = (int32_t)strtoul((char*)buf, NULL, 10);
-#ifdef DEBUG
-    std::cout << "config PT OK, perfIntelPtPerfType = " << perfIntelPtPerfType << std::endl;
-#endif
-
-#ifdef DEBUG
-    std::cout << "try to write msr for ip filter." << std::endl;
-#endif
-    char ip_low[64];
-    char ip_high[64];
-    sprintf(ip_low, "%ld", this->base_address);
-    sprintf(ip_high, "%ld", this->max_address);
-    char* reg_value[2] = {ip_low, NULL};
-    wrmsr_on_all_cpus(0x580, 1, reg_value); //set low limit for ip filtering
-    reg_value[0] = ip_high;
-    wrmsr_on_all_cpus(0x581, 1, reg_value); //set high limit for ip filtering
-#ifdef DEBUG
-    rdmsr_on_all_cpus(0x580);
-    rdmsr_on_all_cpus(0x581);
-    std::cout << "after wrmsr" << std::endl;
-#endif
-
-    return true;
-}
-
-bool pt_fuzzer::load_binary() {
-    FILE* pt_file = fopen(this->raw_binary_file.c_str(), "rb");
-    if(pt_file == nullptr) {
-        return false;
-    }
-    uint64_t code_size = this->max_address - this->base_address;
-    this->code = (uint8_t*)malloc(code_size);
-    memset(this->code, 0, code_size);
-
-    if(NULL == pt_file) {
-        return false;
-    }
-
-    int count = fread (code, code_size, 1, pt_file);
-    fclose(pt_file);
-    if(count != 1) {
-        return false;
-    }
-    return true;
-}
-
-bool pt_fuzzer::build_cofi_map() {
-    std::cout << "[pt_fuzzer::build_cofi_map]start to disassmble binary..." << std::endl;
-    uint64_t total_code_size = this->max_address - this->base_address;
-    uint64_t code_size = total_code_size;
-    std::cout << "[pt_fuzzer::build_cofi_map]total_code_size: " <<total_code_size<<std::endl;
-    uint32_t num_inst = disassemble_binary( this->code, this->base_address, code_size, this->cofi_map);
-    cofi_map.set_decode_info(base_address, total_code_size - code_size, entry_point, base_address, max_address);
-    std::cout << "[pt_fuzzer::build_cofi_map]build_cofi_map, total number of cofi instructions: " << num_inst << std::endl;
-    std::cout << "[pt_fuzzer::build_cofi_map]cofi map complete percentage: " << cofi_map.complete_percentage() << "\%" << std::endl;
-    //std::cout << "first addr = " << cofi_map.begin()->first << std::endl;
-    //std::cout << "last addr = " << (cofi_map.rbegin())->first << std::endl;
-    //
-    //cofi_map.construct_cfg();
-#ifdef DEBUG
-    printf("----------cofi_map\n");
-    //cofi_map.print_map_data();
-    printf("----------bb_list\n");
-    cofi_map.construct_bb_list();
-    //cofi_map.print_bb_list();
-    printf("----------edge_map\n");
-    cofi_map.construct_edge_map();
-    cofi_map.print_edge_map(0);
-
-
-#endif  
-
-    return true;
-}
-
-bool pt_fuzzer::fix_cofi_map(uint64_t tip) {
-    assert(tip >= this->base_address);
-    uint64_t offset = tip - this->base_address;
-    uint64_t total_code_size = this->max_address - tip;
-    uint64_t code_size = total_code_size;
-    uint32_t num_inst = disassemble_binary( this->code + offset, tip, code_size, this->cofi_map);
-    cofi_map.set_decode_info(tip, total_code_size - code_size, entry_point, base_address, max_address);
-    std::cout << "[pt_fuzzer::fix_cofi_map]fix_cofi_map: decode " << num_inst << " number of instructions." << std::endl;
-    std::cout << "[pt_fuzzer::fix_cofi_map]cofi map complete percentage: " << cofi_map.complete_percentage() << "\%" << std::endl;
-    return true;
-}
-
-void pt_fuzzer::init() {
-    if(!config_pt()) {
-        std::cerr << "[pt_fuzzer::init]config PT failed." << std::endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::init]config PT OK." << std::endl;
-#endif
-
-    if(!load_binary()) {
-        std::cerr << "[pt_fuzzer::init]load raw binary file failed." << std::endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::init]load binary OK." << std::endl;
-#endif
-
-    if(!build_cofi_map()){
-        std::cerr << "[pt_fuzzer::init]build cofi map for binary failed." << std::endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::init]build cofi map OK." << std::endl;
-#endif
-
-}
-
-void pt_fuzzer::start_pt_trace(int pid) {
-    this->trace = new pt_tracer(pid);
-    if(!trace->open_pt(perfIntelPtPerfType)){
-        std::cerr << "[pt_fuzzer::start_pt_trace]open PT event failed." << std::endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::start_pt_trace]open PT event OK." << std::endl;
-#endif
-
-     if(!trace->start_trace()){
-     	std::cerr << "[pt_fuzzer::start_pt_trace]start PT event failed." << std::endl;
-     	exit(-1);
-     }
-
-    //rdmsr_on_all_cpus(0x570);
-
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::start_pt_trace]start to trace process, pid = " << pid << std::endl;
-#endif
-}
-
-
-void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
- 
-    if(!this->trace->stop_trace()){
-        std::cerr << "[pt_fuzzer::stop_pt_trace]stop PT event failed." << std::endl;
-        exit(-1);
-    }
-
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::stop_pt_trace]stop pt trace OK." << std::endl;
-#endif
-
-
-
-    std::cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< std::endl;
-
-    pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
-    decoder.decode(get_fuzzer_config().branch_mode);
-
-    this->cofi_map.print_edge_map(0);
-    this->cofi_map.mark_trace_node(decoder.control_flows);
-    this->cofi_map.update_edge_count(decoder.control_flows);
-    
-    this->cofi_map.target_backward_search(this->target_addr);
-
-    this->cofi_map.clear_trace_node();
-
-
-#ifdef DEBUG
-    std::cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << std::endl;
-#endif
-    finished_decoding = true; // notify the decode thread to join.
-
-    this->trace->close_pt();
-    delete this->trace;
-    this->trace = nullptr;
-    memcpy(trace_bits, decoder.get_trace_bits(), MAP_SIZE);
-    num_runs ++;
-
-
-    FILE* f = fopen("../control_inst_flow.txt", "w");
-    if(f != nullptr) {
-        std::cout << "[pt_fuzzer::stop_pt_trace]start to write control flow to file." << std::endl;
-        decoder.dump_control_flows(f);
-        fclose(f);
-    }
-    else {
-        std::cerr << "[pt_fuzzer::stop_pt_trace]open file control_inst_flow.txt failed." << std::endl;
-    }
-
-}
-
-pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode) {
-    if(!this->trace->stop_trace()){
-        std::cerr << "stop PT event failed." << std::endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    std::cout << "stop pt trace OK." << std::endl;
-#endif
-    pt_packet_decoder* decoder = new pt_packet_decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
-    decoder->set_tracing_flag();
-    decoder->decode(mode);
-#ifdef DEBUG
-    std::cout << "decode finished, total number of decoded branch: " << decoder->num_decoded_branch << std::endl;
-#endif
-    this->trace->close_pt();
-    delete this->trace;
-    this->trace = nullptr;
-    memcpy(trace_bits, decoder->get_trace_bits(), MAP_SIZE);
-    num_runs ++;
-    return decoder;
-}
-
-bool pt_tracer::open_pt(int pt_perf_type) {
-
-    int pid = this->trace_pid;
-    struct perf_event_attr pe;
-    memset(&pe, 0, sizeof(struct perf_event_attr));
-    pe.size = sizeof(struct perf_event_attr);
-    ///////////////
-    //不支持kernel-only coverage
-    ///////////////
-    pe.exclude_kernel = 1;
-
-    ///////////////
-    //默认关闭，下一个exec()打开
-    ///////////////
-    pe.disabled = 1;
-    pe.enable_on_exec = 1;
-    //pe.type = PERF_TYPE_HARDWARE;
-    pe.type = pt_perf_type;
-#ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]pe.type = " << pe.type << std::endl;
-#endif
-    pe.config = (1U << 11); /* Disable RETCompression */
-#if !defined(PERF_FLAG_FD_CLOEXEC)
-#define PERF_FLAG_FD_CLOEXEC 0
-#endif
-    perf_fd = perf_event_open(&pe, pid, -1, -1, PERF_FLAG_FD_CLOEXEC);
-    if (perf_fd == -1) {
-        printf("[pt_tracer::open_pt]perf_event_open() failed\n");
-        return false;
-    }
-
-
-    if(perf_support_ip_filter) {
-        if(ioctl(perf_fd, PERF_EVENT_IOC_SET_FILTER, "filter 0x580/580@/bin/bash") < 0){
-            std::cerr << "Warning: set filter for fd " << perf_fd  << " failed, hardware ip filter may not supported." << std::endl;
-            std::cerr << "We stop trying to set ip filter again." << std::endl;
-            perf_support_ip_filter = false;
-        }
-    }
-
-#ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]before wrmsr" << std::endl;
-#endif
-    //char* reg_value[2] = {"0x100002908", nullptr};
-    //rdmsr_on_all_cpus(0x570);
-    //wrmsr_on_all_cpus(0x570, 1, reg_value);
-#ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]after wrmsr" << std::endl;
-#endif
-    //rdmsr_on_all_cpus(0x570);
-    //#if defined(PERF_ATTR_SIZE_VER5)
-    this->perf_pt_header =
-            (uint8_t*)mmap(NULL, _HF_PERF_MAP_SZ + getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, perf_fd, 0);
-    if (this->perf_pt_header == MAP_FAILED) {
-        perror("ERROR: ");
-        this->perf_pt_header = nullptr;
-        printf(
-                "mmap(mmapBuf) failed, sz=%zu, try increasing the kernel.perf_event_mlock_kb sysctl "
-                "(up to even 300000000)\n",
-                (size_t)_HF_PERF_MAP_SZ + getpagesize());
-        close(perf_fd);
-        return false;
-    }
-    //~ To set up an AUX area, first aux_offset needs to be set with
-    //~ an offset greater than data_offset+data_size and aux_size
-    //~ needs to be set to the desired buffer size.  The desired off‐
-    //~ set and size must be page aligned, and the size must be a
-    //~ power of two.
-    struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)this->perf_pt_header;
-    pem->aux_offset = pem->data_offset + pem->data_size;
-    pem->aux_size = get_fuzzer_config().perf_aux_size;
-    std::cout << "[pt_tracer::open_pt]pem->aux_offset = "<<std::hex<<pem->aux_offset<<"pem->aux_size = "<<std::hex<<pem->aux_size << std::endl;
-    this->perf_pt_aux = (uint8_t*)mmap(NULL, pem->aux_size, PROT_READ | PROT_WRITE, MAP_SHARED, perf_fd, pem->aux_offset);
-    if (this->perf_pt_aux == MAP_FAILED) {
-        munmap(this->perf_pt_aux, _HF_PERF_MAP_SZ + getpagesize());
-        this->perf_pt_aux = NULL;
-        perror("ERROR: ");
-        printf(
-                "mmap(mmapAuxBuf) failed, try increasing the kernel.perf_event_mlock_kb sysctl (up to "
-                "even 300000000)\n");
-        close(perf_fd);
-        return false;
-    }
-
-    std::cout << "[pt_tracer::open_pt]begin_tracing set true" << std::endl;
-    pt_ready = true; // to let the decoding thread know the tracing is begin and the data is available
-
-
-    //#else  /* defined(PERF_ATTR_SIZE_VER5) */
-    //~ LOG_F("Your <linux_t/perf_event.h> includes are too old to support Intel PT/BTS");
-    //#endif /* defined(PERF_ATTR_SIZE_VER5) */
-
-#ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]after mmap" << std::endl;
-#endif
-    //rdmsr_on_all_cpus(0x570);
-    return true;
-}
-
-void pt_tracer::close_pt() {
-    munmap(this->perf_pt_aux, get_fuzzer_config().perf_aux_size);
-    this->perf_pt_aux = NULL;
-    munmap(this->perf_pt_header, _HF_PERF_MAP_SZ + getpagesize());
-    this->perf_pt_header = NULL;
-    close(perf_fd);
-}
-
-pt_tracer::pt_tracer(int pid) : trace_pid(pid), perf_pt_header(nullptr), perf_pt_aux(nullptr) {
-
-}
-
-bool pt_tracer::start_trace() {
-    if(ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0) < 0){
-        std::cerr << "enable pt trace for fd " << perf_fd  << " failed." << std::endl;
-        return false;
-    }
-    return true;
-}
-
-bool pt_tracer::stop_trace(){
-    if(ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0) < 0) {
-        std::cerr << "disable trace for fd " << perf_fd << " failed." << std::endl;
-        return false;
-    }
-    if(ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0) > 0){
-        perror("Error: ");
-        return false;
-    }
-    return true;
-}
 
 
 pt_packet_decoder::pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_aux, pt_fuzzer* fuzzer) :
@@ -600,17 +167,13 @@ cofi_inst_t* pt_packet_decoder::get_cofi_obj(uint64_t addr) {
 void pt_packet_decoder::decode_tip(uint64_t tip) {
     if(out_of_bounds(tip)) 
         return;
-
-    if(this->branch_info_mode == TNT_MODE) {    // accurate TNT decoding.
-        assert(tip !=0);
-        cofi_inst_t* cofi_obj = get_cofi_obj(tip);
-        //std::cout <<BOLDYELLOW<< "[pt_packet_decoder::decode_tip] tip: "<<std::hex<< tip<<
-                     //" cofi_obj->inst_addr: "<<std::hex<<cofi_obj->inst_addr<<RESET<< std::endl;
-        alter_bitmap(cofi_obj->inst_addr);
-    }
-    else {   //TIP_MODE or FAKE_TNT_MODE
-        alter_bitmap(tip);
-    }
+   
+    assert(tip !=0);
+    cofi_inst_t* cofi_obj = get_cofi_obj(tip);
+    //std::cout <<BOLDYELLOW<< "[pt_packet_decoder::decode_tip] tip: "<<std::hex<< tip<<
+                 //" cofi_obj->inst_addr: "<<std::hex<<cofi_obj->inst_addr<<RESET<< std::endl;
+    alter_bitmap(cofi_obj->inst_addr);
+    
 }
 
 uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
@@ -779,36 +342,6 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
     return num_tnt_decoded;
 }
 
-uint32_t pt_packet_decoder::decode_fake_tnt(uint64_t entry_point){
-    uint8_t tnt;
-    uint32_t bb_count = 0;
-    std::cout << "[pt_packet_decoder::decode_fake_tnt]to alter_bitmap"  << std::endl;
-    while( true){
-        uint16_t bb = 0;
-        int i;
-        for(i = 0; i < 16; i ++) {
-            tnt = process_tnt_cache(tnt_cache_state);
-            if(tnt == TNT_EMPTY) {
-                break;
-            }
-            if(tnt == TAKEN) {
-                bb = (bb << 1) & 1;
-            }
-            else {
-                bb = bb << 1;
-            }
-        }
-        if(i == 0) {
-            break;
-        }
-        else {
-            alter_bitmap(bb);
-            bb_count ++;
-        }
-
-    }
-    return bb_count;
-}
 
 uint64_t pt_packet_decoder::get_ip_val(unsigned char **pp, unsigned char *end, int len, uint64_t *last_ip)
 {
@@ -861,7 +394,7 @@ static inline void print_unknown(unsigned char* p, unsigned char* end)
     printf("\n");
 }
 
-void pt_packet_decoder::decode(branch_info_mode_t mode) {
+void pt_packet_decoder::decode(void) {
 
     if(this->aux_tail >= this->aux_head) {
         std::cerr << "failed to decode: invalid trace data: aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << std::endl;
@@ -873,8 +406,6 @@ void pt_packet_decoder::decode(branch_info_mode_t mode) {
         std::cerr << "current perf aux buffer size is " << get_fuzzer_config().perf_aux_size << ", you may need to enlarge it." << std::endl;
         return;
     }
-
-    this->branch_info_mode = mode;
 
     uint8_t* map = this->pt_packets;
     uint64_t len = this->aux_head - this->aux_tail - 1;
@@ -1092,38 +623,6 @@ void pt_packet_decoder::flush(){
 }
 
 
-extern "C" {
-pt_fuzzer* the_fuzzer;
-void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point, uint64_t target_addr){
-    if(raw_bin_file == nullptr) {
-        std::cerr << "raw binary file not set." << std::endl;
-        exit(-1);
-    }
-    if(min_addr == 0 || max_addr == 0 || entry_point == 0 || target_addr == 0) {
-        std::cerr << "min_addr, max_addr, entry_point or target_addr not set." << std::endl;
-        exit(-1);
-    }
-    the_fuzzer = new pt_fuzzer(raw_bin_file, min_addr, max_addr, entry_point, target_addr);
-    the_fuzzer->init();
-}
-void start_pt_fuzzer(int pid){
-    the_fuzzer->start_pt_trace(pid);
-    the_fuzzer->start = std::chrono::steady_clock::now();
-}
 
-void stop_pt_fuzzer(uint8_t *trace_bits){
-    the_fuzzer->end = std::chrono::steady_clock::now();
-    the_fuzzer->diff = the_fuzzer->end - the_fuzzer->start;
-#ifdef DEBUG
-    std::cout << "Time of exec: " << the_fuzzer->diff.count()*1000000000 << std::endl;
-#endif
-    the_fuzzer->start = std::chrono::steady_clock::now();
-    the_fuzzer->stop_pt_trace(trace_bits);
-    the_fuzzer->end = std::chrono::steady_clock::now();
-    the_fuzzer->diff = the_fuzzer->end - the_fuzzer->start;
-#ifdef DEBUG
-    std::cout << "Time of decode: " << the_fuzzer->diff.count()*1000000000 << std::endl;
-#endif
-}
 
-}
+

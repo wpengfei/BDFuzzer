@@ -261,7 +261,7 @@ my_cofi_map::my_cofi_map(uint64_t base_address, uint32_t code_size) : i_cofi_map
     //memset(map_data, 0, sizeof(cofi_inst_t*) * code_size);
     map_data = new cofi_inst_t*[code_size]{nullptr};
     bb_ptr = &bb_list;
-    cfg_ptr = &cfg;
+    //cfg_ptr = &cfg;
     bbnum = 0;
     unique_id = 0;
 }
@@ -440,6 +440,8 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     uint64_t target_cofi = map_data[target_addr-base_address]->inst_addr;
     std::cout<<"[target_backward_search]target_cofi: "<<target_cofi<<std::endl;
     uint64_t t = addr_to_idx[target_cofi];
+    if (trace[t] == 1) //trace pass through target.
+        return 1;
     
     uint64_t pos[bbnum]={0}; //current postion in a certain column of the mini_map
     uint64_t step, prev_cur;
@@ -447,6 +449,7 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     std::vector<uint64_t> path;
     uint8_t ret;
 
+    // ------------------------------test data
     uint64_t temp[10][10] = {0}; 
     temp[0][1] = 1;
     temp[0][2] = 1;
@@ -477,6 +480,7 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     std::cout<<RESET<<std::endl;
     uint64_t pos_temp[10] = {0};
     t = 9;
+    //----------------------------------------------------------------------
     std::cout<<"[target_backward_search]t: "<<t<<std::endl;
     uint64_t cur = t;
     while(true){

@@ -227,8 +227,6 @@ class pt_packet_decoder{
     uint64_t target_block;
 
     cofi_map_t& cofi_map;
-    bb_list_t* bb_list;
-    cfg_t* cfg;
 
     uint64_t last_tip = 0;
     uint64_t last_ip2 = 0;
@@ -260,7 +258,7 @@ public:
     pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_aux, pt_fuzzer* fuzzer);
     ~pt_packet_decoder();
     void set_tracing_flag() { tracing_flag = true; }
-    void decode(branch_info_mode_t mode=TNT_MODE);
+    void decode(void);
     uint8_t* get_trace_bits() { return trace_bits; }
 private:
     uint64_t get_ip_val(unsigned char **pp, unsigned char *end, int len, uint64_t *last_ip);
@@ -278,12 +276,9 @@ private:
         std::cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_target0<<" tip: " << std::hex << tip <<RESET<< std::endl;
 #endif
         assert(this->pge_enabled);
-        if(this->branch_info_mode == TNT_MODE) {
-            decode_tnt(this->last_tip);
-        }
-        else if(this->branch_info_mode == FAKE_TNT_MODE) {
-            decode_fake_tnt(this->last_tip);
-        }
+
+        decode_tnt(this->last_tip);
+        
         decode_tip(tip);
         this->last_tip = tip;
 
@@ -353,10 +348,10 @@ private:
         std::cout << "[tip_pgd_handler]tip_pgd: " << std::hex << tip <<RESET<< std::endl;
 #endif
 
-        if(this->branch_info_mode == TNT_MODE) {
-            decode_tnt(this->last_tip);
-            assert(count_tnt(tnt_cache_state) == 0);
-        }
+        
+        decode_tnt(this->last_tip);
+        assert(count_tnt(tnt_cache_state) == 0);
+        
         this->last_tip = 0;
     }
 
@@ -375,12 +370,8 @@ private:
 #ifdef DEBUG
         std::cout << "[psb_handler]psb packet: " << (uint64_t)(**p)<< std::endl;
 #endif
-        if(this->branch_info_mode == TNT_MODE) {
-            decode_tnt(this->last_tip);
-        }
-        else if(this->branch_info_mode == FAKE_TNT_MODE) {
-            decode_fake_tnt(this->last_tip);
-        }
+        decode_tnt(this->last_tip);
+        
         assert(count_tnt(tnt_cache_state) == 0);
         (*p) += PT_PKT_PSB_LEN;
         flush();
@@ -394,9 +385,7 @@ private:
 #endif
 
         assert(this->pge_enabled);
-        if(this->branch_info_mode == TNT_MODE || this->branch_info_mode == FAKE_TNT_MODE) {
-            append_tnt_cache(tnt_cache_state, true, (uint64_t)(**p));
-        }
+        append_tnt_cache(tnt_cache_state, true, (uint64_t)(**p));
 #ifdef DEBUG
         //print_tnt(tnt_cache_state);
         std::cout << "[tnt8_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
@@ -411,9 +400,8 @@ private:
 #endif
 
         assert(this->pge_enabled);
-        if(this->branch_info_mode == TNT_MODE || this->branch_info_mode == FAKE_TNT_MODE) {
-            append_tnt_cache(tnt_cache_state, false, (uint64_t)*p);
-        }
+        append_tnt_cache(tnt_cache_state, false, (uint64_t)*p);
+        
 #ifdef DEBUG
         std::cout << "[long_tnt_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
 #endif
@@ -513,7 +501,6 @@ public:
 class fuzzer_config {
 public:
     uint64_t perf_aux_size = DEFAULT_PERF_AUX_SZ;
-    branch_info_mode_t branch_mode = TNT_MODE;
 public:
     fuzzer_config() {load_config();}
 protected:

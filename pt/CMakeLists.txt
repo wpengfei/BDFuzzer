@@ -13,7 +13,7 @@ ELSE()
     set ( CMAKE_CXX_FLAGS "-std=c++11 -O3 -lpthread -D_FILE_OFFSET_BITS=64 -g ")
 
 ENDIF()
-set(PT_SRC pt.cpp pt_decoder.cpp disassembler.cpp tnt_cache.cpp)
+set(PT_SRC pt.cpp pt_fuzzer.cpp pt_decoder.cpp disassembler.cpp tnt_cache.cpp)
 
 add_library(pt STATIC ${PT_SRC})
 add_executable(run_pt run_pt.cpp)
