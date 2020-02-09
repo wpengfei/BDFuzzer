@@ -33,7 +33,7 @@ bool pt_tracer::open_pt(int pt_perf_type) {
     //pe.type = PERF_TYPE_HARDWARE;
     pe.type = pt_perf_type;
 #ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]pe.type = " << pe.type << std::endl;
+    cout << "[pt_tracer::open_pt]pe.type = " << pe.type << endl;
 #endif
     pe.config = (1U << 11); /* Disable RETCompression */
 #if !defined(PERF_FLAG_FD_CLOEXEC)
@@ -48,20 +48,20 @@ bool pt_tracer::open_pt(int pt_perf_type) {
 
     if(perf_support_ip_filter) {
         if(ioctl(perf_fd, PERF_EVENT_IOC_SET_FILTER, "filter 0x580/580@/bin/bash") < 0){
-            std::cerr << "Warning: set filter for fd " << perf_fd  << " failed, hardware ip filter may not supported." << std::endl;
-            std::cerr << "We stop trying to set ip filter again." << std::endl;
+            cerr << "Warning: set filter for fd " << perf_fd  << " failed, hardware ip filter may not supported." << endl;
+            cerr << "We stop trying to set ip filter again." << endl;
             perf_support_ip_filter = false;
         }
     }
 
 #ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]before wrmsr" << std::endl;
+    cout << "[pt_tracer::open_pt]before wrmsr" << endl;
 #endif
     //char* reg_value[2] = {"0x100002908", nullptr};
     //rdmsr_on_all_cpus(0x570);
     //wrmsr_on_all_cpus(0x570, 1, reg_value);
 #ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]after wrmsr" << std::endl;
+    cout << "[pt_tracer::open_pt]after wrmsr" << endl;
 #endif
     //rdmsr_on_all_cpus(0x570);
     //#if defined(PERF_ATTR_SIZE_VER5)
@@ -85,7 +85,7 @@ bool pt_tracer::open_pt(int pt_perf_type) {
     struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)this->perf_pt_header;
     pem->aux_offset = pem->data_offset + pem->data_size;
     pem->aux_size = get_fuzzer_config().perf_aux_size;
-    std::cout << "[pt_tracer::open_pt]pem->aux_offset = "<<std::hex<<pem->aux_offset<<"pem->aux_size = "<<std::hex<<pem->aux_size << std::endl;
+    cout << "[pt_tracer::open_pt]pem->aux_offset = "<<hex<<pem->aux_offset<<"pem->aux_size = "<<hex<<pem->aux_size << endl;
     this->perf_pt_aux = (uint8_t*)mmap(NULL, pem->aux_size, PROT_READ | PROT_WRITE, MAP_SHARED, perf_fd, pem->aux_offset);
     if (this->perf_pt_aux == MAP_FAILED) {
         munmap(this->perf_pt_aux, _HF_PERF_MAP_SZ + getpagesize());
@@ -98,7 +98,7 @@ bool pt_tracer::open_pt(int pt_perf_type) {
         return false;
     }
 
-    std::cout << "[pt_tracer::open_pt]begin_tracing set true" << std::endl;
+    cout << "[pt_tracer::open_pt]begin_tracing set true" << endl;
     pt_ready = true; // to let the decoding thread know the tracing is begin and the data is available
 
 
@@ -107,7 +107,7 @@ bool pt_tracer::open_pt(int pt_perf_type) {
     //#endif /* defined(PERF_ATTR_SIZE_VER5) */
 
 #ifdef DEBUG
-    std::cout << "[pt_tracer::open_pt]after mmap" << std::endl;
+    cout << "[pt_tracer::open_pt]after mmap" << endl;
 #endif
     //rdmsr_on_all_cpus(0x570);
     return true;
@@ -127,7 +127,7 @@ pt_tracer::pt_tracer(int pid) : trace_pid(pid), perf_pt_header(nullptr), perf_pt
 
 bool pt_tracer::start_trace() {
     if(ioctl(perf_fd, PERF_EVENT_IOC_ENABLE, 0) < 0){
-        std::cerr << "enable pt trace for fd " << perf_fd  << " failed." << std::endl;
+        cerr << "enable pt trace for fd " << perf_fd  << " failed." << endl;
         return false;
     }
     return true;
@@ -135,7 +135,7 @@ bool pt_tracer::start_trace() {
 
 bool pt_tracer::stop_trace(){
     if(ioctl(perf_fd, PERF_EVENT_IOC_DISABLE, 0) < 0) {
-        std::cerr << "disable trace for fd " << perf_fd << " failed." << std::endl;
+        cerr << "disable trace for fd " << perf_fd << " failed." << endl;
         return false;
     }
     if(ioctl(perf_fd, PERF_EVENT_IOC_RESET, 0) > 0){

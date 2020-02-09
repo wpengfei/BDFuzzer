@@ -58,6 +58,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
+using namespace std;
+
 typedef struct{
     uint16_t opcode;
     uint8_t modrm;
@@ -75,16 +77,13 @@ typedef enum cofi_types{
 } cofi_type;
 
 
-//#define DEBUG_COFI_INST
 typedef struct _cofi_inst_t {
     cofi_type type;
     uint64_t bb_start_addr;
     uint64_t inst_addr;
     uint64_t target_addr;
     struct _cofi_inst_t* next_cofi;
-//#ifdef DEBUG_COFI_INST
-    std::string dis_inst;
-//#endif
+    string dis_inst;
 } cofi_inst_t;
 
 
@@ -100,14 +99,10 @@ typedef struct _basic_block_t {
 typedef struct _edge_t {
     bool valid; // is this edge valid in the edge_map?
     uint64_t id; // unique ID used as hash value
-    uint64_t from;
-    uint64_t to;
     uint64_t count; // how many times this edge is executed.
 } edge_t;
 
-
-
-typedef std::map<uint64_t, basic_block_t*> bb_list_t;
+typedef map<uint64_t, basic_block_t*> bb_list_t;
 
 class i_cofi_map {
 protected:
@@ -136,15 +131,16 @@ public:
 
 class my_cofi_map : public i_cofi_map {
     cofi_inst_t** map_data;
-    bb_list_t *bb_ptr, bb_list;
+    bb_list_t bb_list;
 
     uint64_t bbnum;
     uint64_t unique_id;
-    std::map<uint64_t, uint64_t> addr_to_idx; // covert the addr to an index in the edge_map 
-    std::vector<uint64_t> idx_to_addr; // convert the idx to the addr
+    map<uint64_t, uint64_t> addr_to_idx; // covert the addr to an index in the edge_map 
+    vector<uint64_t> idx_to_addr; // convert the idx to the addr
     edge_t ** edge_map;
-    std::vector<uint64_t>  * mini_map;
-    uint8_t * trace;
+    vector<uint64_t>  * mini_map;
+    vector<vector<uint64_t>> search_result;
+    uint8_t * mini_trace;
 public:
     my_cofi_map(uint64_t base_address, uint32_t code_size);
     ~my_cofi_map();
@@ -168,23 +164,18 @@ public:
         if(addr < base_address || addr >= base_address + code_size) return nullptr;
         return map_data[addr-base_address]; 
     }
-    /*
-    inline void mark_trace_edge(uint64_t from, uint64_t to){
-        uint64_t x = addr_to_idx[from];
-        uint64_t y = addr_to_idx[to];
-        this->edge_map[x][y].in_path = true;
-    }*/
-    inline void mark_trace_node(std::vector<uint64_t> cf){
+   
+    inline void mark_trace_node(vector<uint64_t> cf){
         //mark trace
         for(uint64_t i = 0; i < cf.size(); i++){
             uint64_t x = addr_to_idx[cf[i]];
-            this->trace[x] = 1;
+            this->mini_trace[x] = 1;
         }   
     }
     inline void clear_trace_node(){
         
         for(uint64_t i = 0; i < bbnum; i++){ 
-            this->trace[i] = 0;
+            this->mini_trace[i] = 0;
         }
     }
     inline uint64_t get_edge_id(uint64_t from, uint64_t to){
@@ -199,13 +190,13 @@ public:
         assert(this->edge_map[x][y].valid == false);
         //this->edge_map[x][y].in_path = true;
         this->edge_map[x][y].valid = true;
-        this->edge_map[x][y].from = from;
-        this->edge_map[x][y].to = to;
+        //this->edge_map[x][y].from = from;
+        //this->edge_map[x][y].to = to;
         this->edge_map[x][y].id = get_unique_id();
 
         mini_map[y].push_back(x);
     }
-    inline void update_edge_count(std::vector<uint64_t> cf){
+    inline void update_edge_count(vector<uint64_t> cf){
         //update count
         assert(cf.size() >= 2);
         uint64_t i, x, y;
@@ -224,11 +215,8 @@ public:
     void construct_edge_map(void);
     void print_edge_map(uint8_t arg);
     uint64_t target_backward_search(uint64_t target);
-
-    /*
+    uint64_t score_back_path(void);
     
-    uint64_t score_back_path(uint64_t ret);
-    */
 
 };
 

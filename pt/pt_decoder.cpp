@@ -14,6 +14,7 @@
 #define ATOMIC_GET(x) __atomic_load_n(&(x), __ATOMIC_SEQ_CST)
 #define ATOMIC_SET(x, y) __atomic_store_n(&(x), y, __ATOMIC_SEQ_CST)
 
+using namespace std;
 
 extern bool begin_tracing ;
 extern bool finished_decoding ;
@@ -28,7 +29,7 @@ static uint8_t psb[16] = {
 
 
 
-void load_config_file(std::map<std::string, std::string>& config_kvs) {
+void load_config_file(map<string, string>& config_kvs) {
     char line_buf[4096];
     FILE* f = fopen("ptfuzzer.conf", "r");
     if(f == nullptr) {
@@ -38,20 +39,20 @@ void load_config_file(std::map<std::string, std::string>& config_kvs) {
         return;
     }
     while(fgets(line_buf, 4096, f) != nullptr) {
-        std::string line(line_buf);
+        string line(line_buf);
         //trim(line);
         //if(line[0] == '#') continue;
         size_t pos = line.find("#");
-        if(pos != std::string::npos) {
+        if(pos != string::npos) {
             line = line.substr(0, pos);
         }
         trim(line);
         if(line.size() == 0) continue;
-        std::istringstream is_line(line);
-        std::string key;
-        if( std::getline(is_line, key, '=') ) {
-            std::string value;
-            if( std::getline(is_line, value) )
+        istringstream is_line(line);
+        string key;
+        if( getline(is_line, key, '=') ) {
+            string value;
+            if( getline(is_line, value) )
                 config_kvs[key] = value;
         }
     }
@@ -61,15 +62,15 @@ void load_config_file(std::map<std::string, std::string>& config_kvs) {
 }
 
 void fuzzer_config::load_config() {
-    std::map<std::string, std::string> config_kvs;
+    map<string, string> config_kvs;
     load_config_file(config_kvs);
 
     // load aux buffer size
-    std::string config_aux_buffer_size = config_kvs["PERF_AUX_BUFFER_SIZE"];
+    string config_aux_buffer_size = config_kvs["PERF_AUX_BUFFER_SIZE"];
     if(config_aux_buffer_size != "") {
-        uint64_t msize = std::stoul(config_aux_buffer_size, nullptr, 0);
+        uint64_t msize = stoul(config_aux_buffer_size, nullptr, 0);
         this->perf_aux_size = msize * 1024 * 1024;
-        std::cout << "Using perf AUX buffer size: " << msize << " MB." << std::endl;
+        cout << "Using perf AUX buffer size: " << msize << " MB." << endl;
     }
 }
 
@@ -103,7 +104,7 @@ pt_packet_decoder::pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_a
 
 
 #ifdef DEBUG
-    std::cout << "[pt_packet_decoder::pt_packet_decoder]app_entry_point = 0x" <<std::hex << app_entry_point << std::endl;
+    cout << "[pt_packet_decoder::pt_packet_decoder]app_entry_point = 0x" <<hex << app_entry_point << endl;
 #endif
 }
 
@@ -119,7 +120,7 @@ pt_packet_decoder::~pt_packet_decoder() {
 void pt_packet_decoder::print_tnt(tnt_cache_t* tnt_cache){
     uint32_t count = count_tnt(tnt_cache);
 #ifdef DEBUG
-    std::cout << " " << count << " ";
+    cout << " " << count << " ";
 #endif
     uint8_t tnt;
     for(int i = 0; i < count; i ++) {
@@ -127,12 +128,12 @@ void pt_packet_decoder::print_tnt(tnt_cache_t* tnt_cache){
         switch(tnt){
         case TAKEN:
 #ifdef DEBUG
-            std::cout << "T";
+            cout << "T";
 #endif
             break;
         case NOT_TAKEN:
 #ifdef DEBUG
-            std::cout << "N";
+            cout << "N";
 #endif
             break;
         default:
@@ -140,7 +141,7 @@ void pt_packet_decoder::print_tnt(tnt_cache_t* tnt_cache){
         }
     }
 #ifdef DEBUG
-    std::cout << std::endl;
+    cout << endl;
 #endif
 }
 
@@ -148,12 +149,12 @@ cofi_inst_t* pt_packet_decoder::get_cofi_obj(uint64_t addr) {
     cofi_inst_t* cofi_obj = cofi_map.get(addr);
     if(cofi_obj == nullptr){
 #ifdef DEBUG
-        std::cout << "can not find cofi for addr: " << std::hex << "0x" << addr << std::endl;
+        cout << "can not find cofi for addr: " << hex << "0x" << addr << endl;
 #endif
         if(addr == 0) return nullptr;
         else if(out_of_bounds(addr)) {
 #ifdef DEBUG
-            std::cout << std::hex << "addr " << addr << " out of bounds(" << this->min_address << ", " << this->max_address << ")." << std::endl;
+            cout << hex << "addr " << addr << " out of bounds(" << this->min_address << ", " << this->max_address << ")." << endl;
 #endif
             return nullptr;
         }
@@ -170,8 +171,8 @@ void pt_packet_decoder::decode_tip(uint64_t tip) {
    
     assert(tip !=0);
     cofi_inst_t* cofi_obj = get_cofi_obj(tip);
-    //std::cout <<BOLDYELLOW<< "[pt_packet_decoder::decode_tip] tip: "<<std::hex<< tip<<
-                 //" cofi_obj->inst_addr: "<<std::hex<<cofi_obj->inst_addr<<RESET<< std::endl;
+    //cout <<BOLDYELLOW<< "[pt_packet_decoder::decode_tip] tip: "<<hex<< tip<<
+                 //" cofi_obj->inst_addr: "<<hex<<cofi_obj->inst_addr<<RESET<< endl;
     alter_bitmap(cofi_obj->inst_addr);
     
 }
@@ -183,26 +184,26 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 
     if(!start_decode){
 #ifdef DEBUG
-        std::cout << "[pt_packet_decoder::decode_tnt]not start_decode, return." << std::endl;
+        cout << "[pt_packet_decoder::decode_tnt]not start_decode, return." << endl;
 #endif
         return 0;
     }
 
 #ifdef DEBUG
-    std::cout << "[pt_packet_decoder::decode_tnt]calling decode_tnt for inst: " << std::hex << entry_point << std::endl;
+    cout << "[pt_packet_decoder::decode_tnt]calling decode_tnt for inst: " << hex << entry_point << endl;
 #endif
     if(entry_point == 0) return 0;
     cofi_obj = this->get_cofi_obj(entry_point);
     if(cofi_obj == nullptr){
 #ifdef DEBUG
-        std::cerr << "can not find cofi for inst: " << std::hex << entry_point << std::endl;
-        std::cerr << "number of decoded branches: " << num_decoded_branch << std::endl;
+        cerr << "can not find cofi for inst: " << hex << entry_point << endl;
+        cerr << "number of decoded branches: " << num_decoded_branch << endl;
 #endif
         return 0;
     }
 
 #ifdef DEBUG
-    //std::cout << "[pt_packet_decoder::decode_tnt]decode_tnt: before while, start_decode = " << this->start_decode << std::endl; 
+    //cout << "[pt_packet_decoder::decode_tnt]decode_tnt: before while, start_decode = " << this->start_decode << endl; 
 #endif
     while(cofi_obj != nullptr) {
         //alter_bitmap(cofi_obj->inst_addr);
@@ -212,27 +213,27 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
             tnt = process_tnt_cache(tnt_cache_state);
 
 #ifdef DEBUG
-            //std::cout << "[pt_packet_decoder::decode_tnt]decode tnt: "  << std::endl;
+            //cout << "[pt_packet_decoder::decode_tnt]decode tnt: "  << endl;
 #endif
             switch(tnt){
                 case TNT_EMPTY:
 #ifdef DEBUG
-                    std::cerr << "warning: case TNT_EMPTY." << std::endl;
+                    cerr << "warning: case TNT_EMPTY." << endl;
 #endif              assert(false);
                     return num_tnt_decoded;
                 case TAKEN:
                 {
 #ifdef DEBUG
-                    std::cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << std::hex <<cofi_obj->inst_addr << " TAKEN, target = " << cofi_obj->target_addr <<RESET<< std::endl;
+                    cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << hex <<cofi_obj->inst_addr << " TAKEN, target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
                     
                     //if (out_of_bounds(target_addr)){
-                    //    std::cerr << "error: tnt target out of bounds, inst address = " << std::hex << cofi_obj->inst_addr << ", target = " << target_addr << std::endl;
+                    //    cerr << "error: tnt target out of bounds, inst address = " << hex << cofi_obj->inst_addr << ", target = " << target_addr << endl;
                     //	return num_tnt_decoded;
                     //}
                     if(out_of_bounds(cofi_obj->target_addr)){
 #ifdef DEBUG
-                        std::cout <<BOLDYELLOW<< "Target:"<<cofi_obj->target_addr<<"Out of bounds, change to 0!" << std::hex <<RESET<< std::endl;
+                        cout <<BOLDYELLOW<< "Target:"<<cofi_obj->target_addr<<"Out of bounds, change to 0!" << hex <<RESET<< endl;
 #endif
                         last_target0 = cofi_obj->inst_addr;
                         cofi_obj->target_addr = 0;
@@ -251,7 +252,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 
                         
                         
-                        //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
+                        //cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< hex <<RESET<< endl;
 
                         cofi_obj = get_cofi_obj(cofi_obj->target_addr);
                     }
@@ -260,7 +261,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                 case NOT_TAKEN:
                     //~ sample_decoded_detailed("(%d)\t%lx\t(Not Taken)\n", COFI_TYPE_CONDITIONAL_BRANCH ,obj->cofi->ins_addr);
 #ifdef DEBUG
-                    std::cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << std::hex <<cofi_obj->inst_addr << " NOT_TAKEN, next = " << cofi_obj->next_cofi->inst_addr <<RESET<< std::endl;
+                    cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << hex <<cofi_obj->inst_addr << " NOT_TAKEN, next = " << cofi_obj->next_cofi->inst_addr <<RESET<< endl;
 #endif            
                     uint64_t next_cofi = cofi_obj->next_cofi->inst_addr;
                     
@@ -269,7 +270,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     control_flows.push_back(next_cofi);
                     
 
-                    //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< std::hex <<RESET<< std::endl;
+                    //cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< hex <<RESET<< endl;
                     cofi_obj = cofi_obj->next_cofi;
 
                     break;
@@ -278,11 +279,11 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 
             case COFI_TYPE_UNCONDITIONAL_DIRECT_BRANCH: {
 #ifdef DEBUG
-                std::cout << BOLDMAGENTA<< "COFI_TYPE_UNCONDITIONAL_DIRECT_BRANCH: " << std::hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< std::endl;
+                cout << BOLDMAGENTA<< "COFI_TYPE_UNCONDITIONAL_DIRECT_BRANCH: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
                 if(out_of_bounds(cofi_obj->target_addr)){
 #ifdef DEBUG
-                    std::cout <<BOLDYELLOW<< "Target: "<<cofi_obj->target_addr<<" Out of bounds, change to 0!" << std::hex <<RESET<< std::endl;
+                    cout <<BOLDYELLOW<< "Target: "<<cofi_obj->target_addr<<" Out of bounds, change to 0!" << hex <<RESET<< endl;
 #endif
                     last_target0 = cofi_obj->inst_addr;// last cofi whose target it is 0
                     cofi_obj->target_addr = 0;
@@ -298,14 +299,14 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     control_flows.push_back(target_cofi);
                     
 
-                    //std::cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< std::hex <<RESET<< std::endl;
+                    //cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< hex <<RESET<< endl;
                     cofi_obj = get_cofi_obj(cofi_obj->target_addr);
                 }
                 break;
             }
             case COFI_TYPE_INDIRECT_BRANCH:
 #ifdef DEBUG
-                std::cout << BOLDMAGENTA<< "COFI_TYPE_INDIRECT_BRANCH: " << std::hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< std::endl;
+                cout << BOLDMAGENTA<< "COFI_TYPE_INDIRECT_BRANCH: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
                 this->last_target0 = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
@@ -313,7 +314,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 
             case COFI_TYPE_NEAR_RET:
 #ifdef DEBUG
-                std::cout << BOLDMAGENTA<< "COFI_TYPE_NEAR_RET: " << std::hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< std::endl;
+                cout << BOLDMAGENTA<< "COFI_TYPE_NEAR_RET: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif        
                 this->last_target0 = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
@@ -321,14 +322,14 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 
             case COFI_TYPE_FAR_TRANSFERS:
 #ifdef DEBUG
-                std::cout << BOLDMAGENTA<< "COFI_TYPE_FAR_TRANSFERS: " << std::hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< std::endl;
+                cout << BOLDMAGENTA<< "COFI_TYPE_FAR_TRANSFERS: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
                 this->last_target0 = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
                 break;
 
             case NO_COFI_TYPE:
-                std::cout << BOLDMAGENTA<< "NO_COFI_TYPE "<<RESET<<std::endl;
+                cout << BOLDMAGENTA<< "NO_COFI_TYPE "<<RESET<<endl;
                 cofi_obj = nullptr;
                 assert(false);
                 break;
@@ -374,7 +375,7 @@ uint64_t pt_packet_decoder::get_ip_val(unsigned char **pp, unsigned char *end, i
 }
 
 void pt_packet_decoder::dump_control_flows(FILE* f) {
-    std::cout << "dump control flow inst, total inst is: " << control_flows.size() << std::endl;
+    cout << "dump control flow inst, total inst is: " << control_flows.size() << endl;
     for(int i = 0; i < this->control_flows.size(); i ++) {
         fprintf(f, "%p\n", control_flows[i]);
     }
@@ -397,13 +398,13 @@ static inline void print_unknown(unsigned char* p, unsigned char* end)
 void pt_packet_decoder::decode(void) {
 
     if(this->aux_tail >= this->aux_head) {
-        std::cerr << "failed to decode: invalid trace data: aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << std::endl;
+        cerr << "failed to decode: invalid trace data: aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << endl;
         return;
     }
 
     if(this->aux_head - this->aux_tail >= get_fuzzer_config().perf_aux_size ) {
-        std::cerr << "perf aux buffer full, PT packets may be truncated." << std::endl;
-        std::cerr << "current perf aux buffer size is " << get_fuzzer_config().perf_aux_size << ", you may need to enlarge it." << std::endl;
+        cerr << "perf aux buffer full, PT packets may be truncated." << endl;
+        cerr << "current perf aux buffer size is " << get_fuzzer_config().perf_aux_size << ", you may need to enlarge it." << endl;
         return;
     }
 
@@ -414,13 +415,13 @@ void pt_packet_decoder::decode(void) {
     uint8_t byte0;
 
 #ifdef DEBUG
-    std::cout << "[pt_packet_decoder::decode]try to decode packet buffer: " << (uint64_t)this->pt_packets << ", aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << ", size = " << (int64_t)len << std::endl;
+    cout << "[pt_packet_decoder::decode]try to decode packet buffer: " << (uint64_t)this->pt_packets << ", aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << ", size = " << (int64_t)len << endl;
 #endif
     for (p = map; p < end; ) {
         p = (unsigned char *)memmem(p, end - p, psb, PT_PKT_PSB_LEN);
         if (!p) {
 #ifdef DEBUG
-            std::cout << "[pt_packet_decoder::decode]!p: "<<finished_execution<<std::endl; 
+            cout << "[pt_packet_decoder::decode]!p: "<<finished_execution<<endl; 
 #endif
             p = end;
             break;/*
@@ -438,7 +439,7 @@ void pt_packet_decoder::decode(void) {
 
             cnt +=1;
             byte0 = *p;
-            //std::cout <<BOLDGREEN<< "[pt_packet_decoder::decode] pkt byte = "<<std::bitset<8>(byte0) <<RESET<< std::endl;
+            //cout <<BOLDGREEN<< "[pt_packet_decoder::decode] pkt byte = "<<bitset<8>(byte0) <<RESET<< endl;
             /* pad */
             if (byte0 == 0) {
                 //pad_handler(self, &p);
@@ -463,7 +464,7 @@ void pt_packet_decoder::decode(void) {
             /* tnt8 */
             if ((byte0 & BIT(0)) == 0 && byte0 != 2){
 #ifdef DEBUG
-                std::cout << "[pt_packet_decoder::decode] goto tnt8_handler"<< std::endl;
+                cout << "[pt_packet_decoder::decode] goto tnt8_handler"<< endl;
 #endif
                 tnt8_handler(&p);
                 continue;
@@ -489,7 +490,7 @@ void pt_packet_decoder::decode(void) {
             case PT_PKT_TIP_BYTE0:
             {
 #ifdef DEBUG
-                std::cout << "[pt_packet_decoder::decode] goto tip_handler"<< std::endl;
+                cout << "[pt_packet_decoder::decode] goto tip_handler"<< endl;
 #endif
                 tip_handler(&p, &end);
                 continue;
@@ -499,7 +500,7 @@ void pt_packet_decoder::decode(void) {
             case PT_PKT_TIP_PGE_BYTE0:
             {
 #ifdef DEBUG
-                std::cout << "[pt_packet_decoder::decode] goto tip_pge_handler"<< std::endl;
+                cout << "[pt_packet_decoder::decode] goto tip_pge_handler"<< endl;
 #endif
                 tip_pge_handler(&p, &end);
                 continue;
@@ -509,7 +510,7 @@ void pt_packet_decoder::decode(void) {
             case PT_PKT_TIP_PGD_BYTE0:
             {
 #ifdef DEBUG
-                std::cout << "[pt_packet_decoder::decode] goto tip_pgd_handler"<< std::endl;
+                cout << "[pt_packet_decoder::decode] goto tip_pgd_handler"<< endl;
 #endif
                 tip_pgd_handler( &p, &end);
                 continue;
@@ -519,7 +520,7 @@ void pt_packet_decoder::decode(void) {
             case PT_PKT_TIP_FUP_BYTE0:
             {
 #ifdef DEBUG
-                std::cout << "[pt_packet_decoder::decode] goto tip_fup_handler"<< std::endl;
+                cout << "[pt_packet_decoder::decode] goto tip_fup_handler"<< endl;
 #endif
                 tip_fup_handler( &p, &end);
                 continue;
@@ -540,7 +541,7 @@ void pt_packet_decoder::decode(void) {
                 /* PSB */
                 if (p[1] == PT_PKT_PSB_BYTE1 && LEFT(PT_PKT_PSB_LEN) && !memcmp(p, psb, PT_PKT_PSB_LEN)) {
 #ifdef DEBUG
-                    std::cout << "[pt_packet_decoder::decode] goto psb_handler"<< std::endl;
+                    cout << "[pt_packet_decoder::decode] goto psb_handler"<< endl;
 #endif
                     psb_handler(&p);
                     continue;
@@ -556,7 +557,7 @@ void pt_packet_decoder::decode(void) {
                 /* long TNT */
                 if (p[1] == PT_PKT_LTNT_BYTE1 && LEFT(PT_PKT_LTNT_LEN)) {
 #ifdef DEBUG
-                    std::cout << "[pt_packet_decoder::decode] goto long_tnt_handler" << std::endl;
+                    cout << "[pt_packet_decoder::decode] goto long_tnt_handler" << endl;
 #endif
                     long_tnt_handler(&p);
                     continue;
@@ -600,16 +601,16 @@ void pt_packet_decoder::decode(void) {
 
 #ifdef DEBUG
             print_unknown(p, end);
-            std::cout << "[pt_packet_decoder::decode]unknow pt packets." << std::endl;
+            cout << "[pt_packet_decoder::decode]unknow pt packets." << endl;
 #endif
             return;
         }
     }
 #ifdef DEBUG
-    std::cout << "[pt_packet_decoder::decode]all PT parckets are decoded." << std::endl;
+    cout << "[pt_packet_decoder::decode]all PT parckets are decoded." << endl;
 #endif
 #ifdef DEBUG
-    std::cout << "[pt_packet_decoder::decode]number of TNT left undecoded: " << count_tnt(this->tnt_cache_state) << std::endl;
+    cout << "[pt_packet_decoder::decode]number of TNT left undecoded: " << count_tnt(this->tnt_cache_state) << endl;
 #endif
 
 }

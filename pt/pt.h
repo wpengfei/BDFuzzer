@@ -148,6 +148,8 @@
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
+using namespace std;
+
 //global variables
 extern bool pt_ready;
 extern bool finished_decoding;
@@ -251,7 +253,7 @@ class pt_packet_decoder{
 
 public:
     uint64_t num_decoded_branch = 0;
-    std::vector<uint64_t> control_flows;
+    vector<uint64_t> control_flows;
     
 
 public:
@@ -267,13 +269,13 @@ private:
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
 #ifdef DEBUG
-            std::cout << "[tip_handler]enter program entry point" << std::endl;
+            cout << "[tip_handler]enter program entry point" << endl;
 #endif
             this->start_decode = true;
         }
 
 #ifdef DEBUG
-        std::cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_target0<<" tip: " << std::hex << tip <<RESET<< std::endl;
+        cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_target0<<" tip: " << hex << tip <<RESET<< endl;
 #endif
         assert(this->pge_enabled);
 
@@ -293,7 +295,7 @@ private:
                 control_flows.push_back(last_cofi);
             control_flows.push_back(cofi);
             
-            //std::cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
+            //cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< hex <<RESET<< endl;
 
             this->last_target0 = 0;
         }
@@ -304,13 +306,13 @@ private:
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
 #ifdef DEBUG
-            std::cout << "[tip_pge_handler]enter program entry point" << std::endl;
+            cout << "[tip_pge_handler]enter program entry point" << endl;
 #endif
             this->start_decode = true;
         }
 
 #ifdef DEBUG
-        std::cout <<BOLDYELLOW<< "[tip_pge_handler]cofi:"<<this->last_target0<<" tip: " << std::hex << tip <<RESET<< std::endl;
+        cout <<BOLDYELLOW<< "[tip_pge_handler]cofi:"<<this->last_target0<<" tip: " << hex << tip <<RESET<< endl;
 
 #endif
         assert(this->last_tip == 0);
@@ -327,7 +329,7 @@ private:
                 control_flows.push_back(last_cofi);
             control_flows.push_back(cofi);
             
-            //std::cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< std::hex <<RESET<< std::endl;
+            //cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< hex <<RESET<< endl;
 
             this->last_target0 = 0;
         }
@@ -339,13 +341,13 @@ private:
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
 #ifdef DEBUG
-            std::cout << "[tip_pgd_handler]enter program entry point" << std::endl;
+            cout << "[tip_pgd_handler]enter program entry point" << endl;
 #endif
             this->start_decode = true;
         }
 
 #ifdef DEBUG
-        std::cout << "[tip_pgd_handler]tip_pgd: " << std::hex << tip <<RESET<< std::endl;
+        cout << "[tip_pgd_handler]tip_pgd: " << hex << tip <<RESET<< endl;
 #endif
 
         
@@ -359,7 +361,7 @@ private:
     inline void tip_fup_handler(uint8_t** p, uint8_t** end){
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
 #ifdef DEBUG
-        std::cout << "[tip_fup_handler]tip_fup: " << std::hex << tip <<RESET << std::endl;
+        cout << "[tip_fup_handler]tip_fup: " << hex << tip <<RESET << endl;
 #endif
         //just change the state
         if (this->last_tip == 0)
@@ -368,7 +370,7 @@ private:
 
     inline void psb_handler(uint8_t** p){
 #ifdef DEBUG
-        std::cout << "[psb_handler]psb packet: " << (uint64_t)(**p)<< std::endl;
+        cout << "[psb_handler]psb packet: " << (uint64_t)(**p)<< endl;
 #endif
         decode_tnt(this->last_tip);
         
@@ -381,14 +383,14 @@ private:
     inline void tnt8_handler(uint8_t** p){
         //uint64_t old_count = count_tnt(tnt_cache_state);
 #ifdef DEBUG
-        std::cout << "[tnt8_handler]tnt8: " << tnt_to_string(true, (uint64_t)(**p)) << std::endl;
+        cout << "[tnt8_handler]tnt8: " << tnt_to_string(true, (uint64_t)(**p)) << endl;
 #endif
 
         assert(this->pge_enabled);
         append_tnt_cache(tnt_cache_state, true, (uint64_t)(**p));
 #ifdef DEBUG
         //print_tnt(tnt_cache_state);
-        std::cout << "[tnt8_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
+        cout << "[tnt8_handler]count_tnt: " << count_tnt(tnt_cache_state) << endl;
         //tnt_cache_destroy(tnt_cache);
 #endif
         (*p)++;
@@ -396,14 +398,14 @@ private:
 
     inline void long_tnt_handler(uint8_t** p){
 #ifdef DEBUG
-        std::cout << "[long_tnt_handler]long_tnt: " << tnt_to_string(false, (uint64_t)(**p)) << std::endl;;
+        cout << "[long_tnt_handler]long_tnt: " << tnt_to_string(false, (uint64_t)(**p)) << endl;;
 #endif
 
         assert(this->pge_enabled);
         append_tnt_cache(tnt_cache_state, false, (uint64_t)*p);
         
 #ifdef DEBUG
-        std::cout << "[long_tnt_handler]count_tnt: " << count_tnt(tnt_cache_state) << std::endl;
+        cout << "[long_tnt_handler]count_tnt: " << count_tnt(tnt_cache_state) << endl;
 #endif
         (*p) += PT_PKT_LTNT_LEN;
     }
@@ -458,7 +460,7 @@ public:
 };
 
 class pt_fuzzer {
-    std::string raw_binary_file;
+    string raw_binary_file;
     uint64_t base_address;
     uint64_t max_address;
     uint64_t entry_point;
@@ -474,15 +476,15 @@ class pt_fuzzer {
     uint64_t num_runs = 0;
 
 public:
-    pt_fuzzer(std::string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr);
+    pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr);
     void init();
     void start_pt_trace(int pid);
     void stop_pt_trace(uint8_t *trace_bits);
     uint64_t get_target(void){return target_addr;}
     pt_packet_decoder* debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode=TNT_MODE);
-    std::chrono::time_point<std::chrono::steady_clock> start;
-    std::chrono::time_point<std::chrono::steady_clock> end;
-    std::chrono::duration<double> diff;
+    chrono::time_point<chrono::steady_clock> start;
+    chrono::time_point<chrono::steady_clock> end;
+    chrono::duration<double> diff;
     bool fix_cofi_map(uint64_t tip);
 private:
     bool load_binary();

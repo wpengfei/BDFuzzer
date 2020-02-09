@@ -30,6 +30,8 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 #define MODRM_REG(x)            (x << 3)
 #define MODRM_AND                       0b00111000
 
+using namespace std;
+
 /* http://stackoverflow.com/questions/29600668/what-meaning-if-any-does-the-mod-r-m-byte-carry-for-the-unconditional-jump-ins */
 /* conditional branch */
 cofi_ins cb_lookup[] = {
@@ -233,6 +235,10 @@ uint32_t disassemble_binary(const uint8_t* code, uint64_t base_address, uint64_t
             num_cofi_inst ++;
             current_cofi->inst_addr = insn->address;
             current_cofi->type = get_inst_type(insn);
+            string s1 = insn->mnemonic;
+            string s2 = insn->op_str;
+            current_cofi->dis_inst = s1 +" "+ s2;
+
             if (type == COFI_TYPE_CONDITIONAL_BRANCH || type == COFI_TYPE_UNCONDITIONAL_DIRECT_BRANCH){
                 current_cofi->target_addr = hex_to_bin(insn->op_str);
             }
@@ -260,8 +266,6 @@ my_cofi_map::my_cofi_map(uint64_t base_address, uint32_t code_size) : i_cofi_map
     //map_data = (cofi_inst_t**)malloc(sizeof(cofi_inst_t*) * code_size);
     //memset(map_data, 0, sizeof(cofi_inst_t*) * code_size);
     map_data = new cofi_inst_t*[code_size]{nullptr};
-    bb_ptr = &bb_list;
-    //cfg_ptr = &cfg;
     bbnum = 0;
     unique_id = 0;
 }
@@ -275,7 +279,7 @@ my_cofi_map::~my_cofi_map() {
 
 
 void my_cofi_map::my_cofi_map::print_map_data(void){
-    std::cout<<"code_size: "<<code_size<<" base_address: "<<std::hex<<base_address<<std::endl;
+    cout<<"code_size: "<<code_size<<" base_address: "<<hex<<base_address<<endl;
     for (uint64_t i = 0; i<code_size; i++){
         if (map_data[i]!= nullptr){
             if(map_data[i]->next_cofi!=nullptr)
@@ -322,7 +326,7 @@ void my_cofi_map::construct_bb_list(void){
         
     }
     //determine bb->target_bb and bb->target_cofi, filter out the out-of-bound targets.
-    std::map<uint64_t, basic_block_t*>::iterator it;
+    map<uint64_t, basic_block_t*>::iterator it;
     
     for (it = bb_list.begin(); it!=bb_list.end();it++){
         this->bbnum++;
@@ -338,7 +342,7 @@ void my_cofi_map::construct_bb_list(void){
 
     }
     
-    std::map<uint64_t, uint64_t>::iterator i;
+    map<uint64_t, uint64_t>::iterator i;
     /*
     for (i = addr_to_idx.begin(); i!=addr_to_idx.end();i++){
         printf("%x -> %d\n", i->first, i->second);
@@ -349,7 +353,7 @@ void my_cofi_map::construct_bb_list(void){
 
 
 void my_cofi_map::print_bb_list(void){
-    std::map<uint64_t, basic_block_t*>::iterator it;
+    map<uint64_t, basic_block_t*>::iterator it;
     for (it = bb_list.begin(); it!=bb_list.end();it++){
         printf("[%x], bb_start_addr: %x bb_end_addr: %x target_addr: %x  target_cofi: %x next_cofi: %x cofi_type: %x\n", 
         it->first, it->second->bb_start_addr, it->second->bb_end_addr, 
@@ -368,7 +372,7 @@ void my_cofi_map::construct_edge_map(void){
     assert(bbnum != 0);
 
     edge_t** temp = new edge_t*[bbnum];    
-    std::vector<uint64_t> * mini_temp = new std::vector<uint64_t>[bbnum];
+    vector<uint64_t> * mini_temp = new vector<uint64_t>[bbnum];
     mini_map = mini_temp;
 
     for(uint64_t i = 0; i < bbnum; i++){
@@ -378,10 +382,10 @@ void my_cofi_map::construct_edge_map(void){
     edge_map = temp;  
 
     uint8_t* trace_tmp = new uint8_t[bbnum];
-    trace = trace_tmp;
-    memset(trace, 0, sizeof(uint8_t)*bbnum);
+    mini_trace = trace_tmp;
+    memset(mini_trace, 0, sizeof(uint8_t)*bbnum);
 
-    std::map<uint64_t, basic_block_t*>::iterator it;
+    map<uint64_t, basic_block_t*>::iterator it;
     for (it = bb_list.begin(); it != bb_list.end();it++){
         next_cofi = it->second->next_cofi;
         target_cofi = it->second->target_cofi;
@@ -390,15 +394,15 @@ void my_cofi_map::construct_edge_map(void){
             y = addr_to_idx[next_cofi];
             
             edge_map[x][y].valid = true;
-            edge_map[x][y].from  = it->first;
-            edge_map[x][y].to = next_cofi; 
+            //edge_map[x][y].from  = it->first;
+            //edge_map[x][y].to = next_cofi; 
             edge_map[x][y].id = get_unique_id();
         }
         if(target_cofi != 0){
             y = addr_to_idx[target_cofi];
             this->edge_map[x][y].valid = true;
-            this->edge_map[x][y].from  = it->first;
-            this->edge_map[x][y].to = target_cofi;
+            //this->edge_map[x][y].from  = it->first;
+            //this->edge_map[x][y].to = target_cofi;
             edge_map[x][y].id = get_unique_id();
         }
     }
@@ -409,9 +413,9 @@ void my_cofi_map::construct_edge_map(void){
             if(edge_map[i][j].valid == true)
                 mini_map[j].push_back(i);
         }
-        std::cout<<BOLDYELLOW<<mini_map[j].size();
+        cout<<BOLDYELLOW<<mini_map[j].size();
     }
-    std::cout<<RESET<<std::endl;
+    cout<<RESET<<endl;
 
     
 }
@@ -431,22 +435,45 @@ void my_cofi_map::print_edge_map(uint8_t arg = 0){
     }   
 }
 
+/*
+for the following edge_map:
+0110000000
+0001100000
+0000011000
+0000000000
+0000000011
+0000000100
+0000000011
+0000000000
+0000000000
+0000000000
+
+the mini_map is
+_001122544
+________66
+
+pos[i] indicates the position of column i in the mini_map, 
+e.g., when pos[9] = 1, mini_map[9][pos[9]] == 6
+
+*/
+
 
 
 
 
 uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
-    std::cout<<"[target_backward_search]target_addr: "<<target_addr<<std::endl;
+    cout<<"[target_backward_search]target_addr: "<<target_addr<<endl;
     uint64_t target_cofi = map_data[target_addr-base_address]->inst_addr;
-    std::cout<<"[target_backward_search]target_cofi: "<<target_cofi<<std::endl;
+    cout<<"[target_backward_search]target_cofi: "<<target_cofi<<endl;
     uint64_t t = addr_to_idx[target_cofi];
-    if (trace[t] == 1) //trace pass through target.
+    if (mini_trace[t] == 1) //trace pass through target.
         return 1;
     
     uint64_t pos[bbnum]={0}; //current postion in a certain column of the mini_map
-    uint64_t step, prev_cur;
+    uint64_t prev_cur;
     
-    std::vector<uint64_t> path;
+    vector<uint64_t> path;
+    
     uint8_t ret;
 
     // ------------------------------test data
@@ -469,19 +496,19 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
 
     uint64_t trace_temp[10] = {1,1,0,1,0,0,0,0,0,0};
 
-    std::vector<uint64_t> * mini_temp = new std::vector<uint64_t>[10];
+    vector<uint64_t> * mini_temp = new vector<uint64_t>[10];
     for(uint64_t j = 0; j < 10; j++){
         for (uint64_t i = 0; i < 10; i++){
             if(temp[i][j] == 1)
                 mini_temp[j].push_back(i);
         }
-        std::cout<<BOLDYELLOW<<mini_temp[j].size();
+        cout<<BOLDYELLOW<<mini_temp[j].size();
     }
-    std::cout<<RESET<<std::endl;
+    cout<<RESET<<endl;
     uint64_t pos_temp[10] = {0};
     t = 9;
     //----------------------------------------------------------------------
-    std::cout<<"[target_backward_search]t: "<<t<<std::endl;
+    cout<<"[target_backward_search]t: "<<t<<endl;
     uint64_t cur = t;
     while(true){
         printf("cur = %d, pos[%d] = %d\n", cur, cur, pos_temp[cur]);
@@ -491,8 +518,14 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
             break; //stop at first step
         }
         else if (trace_temp[cur] == 1){
-            for(uint64_t n = 0; n < path.size(); n++)
+            vector<uint64_t> cur_path;
+            for(uint64_t n = 0; n < path.size(); n++){
                 printf("%d->", path[n]);
+                cur_path.push_back(path[n]);
+            }
+            cur_path.push_back(cur);
+            search_result.push_back(cur_path);
+
             printf("%d\n",cur);
 
             pos_temp[cur] = 0; // erease
@@ -529,54 +562,24 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
 
 }
 
-/*
-    assert(target != 0);
+uint64_t my_cofi_map::score_back_path(void){
 
-    if(cfg[target][0]->in_cur_trace){
-        std::cout<<"[target_backward_search]target in trace"<<std::endl;
-        return 1;
+    printf("[score_back_path] search_result:\n");
+    for (uint64_t i = 0; i < search_result.size(); i++){
+        for (uint64_t j = 0; j < search_result[i].size(); j++){
+            printf("%d->", search_result[i][j] );
+        }
+
+        printf("\n");
     }
-    else if(cfg[target].size()>1 && cfg[target][1]->in_cur_trace){
-        std::cout<<"[target_backward_search]target in trace"<<std::endl;
-        return 1;
-    }
-
-    uint64_t node = target;
-    while(cfg[node].size()>0){
-        if(cfg[node][0]->in_cur_trace){
-            std::cout<<node<<std::endl;
-            std::cout<<"[target_backward_search]find trace node: "<<node<<std::endl;
-            return node;
-        }
-        else if(cfg[node].size()>1 && cfg[node][1]->in_cur_trace){
-            std::cout<<node<<std::endl;
-            std::cout<<"[target_backward_search]find trace node: "<<node<<std::endl;
-            return node;
-        }
-        else {
-            std::cout<<node<<"->";
-            back_trace.push_back(node);
-            node = cfg[node][0]->prev;
-            if (node == 0){
-                std::cout<<"\n[target_backward_search]finish, connot find trace node"<<std::endl;
-                return 0;
-            }
-        }
-    } 
-    assert(false);  
-    */ 
-
-
-
-/*
-
-uint64_t my_cofi_map::score_back_path(uint64_t ret){
     
+}
+/*
     uint64_t n = this->back_trace.size();
-    std::reverse(this->back_trace.begin(), this->back_trace.end());
+    reverse(this->back_trace.begin(), this->back_trace.end());
     for (uint64_t i=0; i<n; i++)
-        std::cout<<this->back_trace[i]<<"->";
-    std::cout<<std::endl;
+        cout<<this->back_trace[i]<<"->";
+    cout<<endl;
     assert(n > 0);
     uint64_t i = 0;
     uint64_t cur_node;
