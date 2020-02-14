@@ -98,8 +98,10 @@ typedef struct _basic_block_t {
 
 typedef struct _edge_t {
     bool valid; // is this edge valid in the edge_map?
+    bool is_unary; //is a single branch, e.g., unconditional direct jump
     uint64_t id; // unique ID used as hash value
     uint64_t count; // how many times this edge is executed.
+    double p; // the probability of taking this edge
 } edge_t;
 
 typedef map<uint64_t, basic_block_t*> bb_list_t;
@@ -138,7 +140,8 @@ class my_cofi_map : public i_cofi_map {
     map<uint64_t, uint64_t> addr_to_idx; // covert the addr to an index in the edge_map 
     vector<uint64_t> idx_to_addr; // convert the idx to the addr
     edge_t ** edge_map;
-    vector<uint64_t>  * mini_map;
+    vector<uint64_t>  * mini_map_x;
+    vector<uint64_t>  * mini_map_y;
     vector<vector<uint64_t>> search_result;
     uint8_t * mini_trace;
 public:
@@ -165,14 +168,14 @@ public:
         return map_data[addr-base_address]; 
     }
    
-    inline void mark_trace_node(vector<uint64_t> cf){
+    inline void mark_mini_trace(vector<uint64_t> cf){
         //mark trace
         for(uint64_t i = 0; i < cf.size(); i++){
             uint64_t x = addr_to_idx[cf[i]];
             this->mini_trace[x] = 1;
         }   
     }
-    inline void clear_trace_node(){
+    inline void clear_mini_trace(){
         
         for(uint64_t i = 0; i < bbnum; i++){ 
             this->mini_trace[i] = 0;
@@ -184,17 +187,19 @@ public:
         return this->edge_map[x][y].id;
     }
 
-    inline void add_edge(uint64_t from, uint64_t to){
+    inline uint8_t add_edge(uint64_t from, uint64_t to){
         uint64_t x = addr_to_idx[from];
         uint64_t y = addr_to_idx[to];
-        assert(this->edge_map[x][y].valid == false);
-        //this->edge_map[x][y].in_path = true;
-        this->edge_map[x][y].valid = true;
-        //this->edge_map[x][y].from = from;
-        //this->edge_map[x][y].to = to;
-        this->edge_map[x][y].id = get_unique_id();
-
-        mini_map[y].push_back(x);
+        // if added before, skip
+        if (this->edge_map[x][y].valid == false){
+            this->edge_map[x][y].valid = true;
+            this->edge_map[x][y].id = get_unique_id();
+            mini_map_x[y].push_back(x);
+            mini_map_y[x].push_back(y);
+            return 1;
+        }
+        else
+            return 0;
     }
     inline void update_edge_count(vector<uint64_t> cf){
         //update count
@@ -204,6 +209,7 @@ public:
         while (i+1<cf.size()){
             x = addr_to_idx[cf[i]];
             y = addr_to_idx[cf[i+1]];
+            this->edge_map[x][y].valid = true;
             this->edge_map[x][y].count++;
             i++;
         }
@@ -215,8 +221,9 @@ public:
     void construct_edge_map(void);
     void print_edge_map(uint8_t arg);
     uint64_t target_backward_search(uint64_t target);
-    uint64_t score_back_path(void);
-    
+    uint64_t target_backward_search_test(uint64_t target_addr);
+    double score_back_path(void);
+    void update_probability(void);
 
 };
 

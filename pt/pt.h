@@ -460,6 +460,9 @@ public:
 };
 
 class pt_fuzzer {
+
+public:
+    cofi_map_t cofi_map;
     string raw_binary_file;
     uint64_t base_address;
     uint64_t max_address;
@@ -467,7 +470,7 @@ class pt_fuzzer {
     uint64_t target_addr;
 
     int32_t perfIntelPtPerfType = -1;
-    cofi_map_t cofi_map;
+    
 
     uint8_t* code;
 

@@ -125,7 +125,7 @@ bool pt_fuzzer::build_cofi_map() {
     cofi_map.print_bb_list();
     printf("----------edge_map\n");
     cofi_map.construct_edge_map();
-    //cofi_map.print_edge_map(0);
+    cofi_map.print_edge_map(0);
 
 
 #endif  
@@ -213,15 +213,19 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
     decoder.decode(); // main phase to decode pt packets
 
-    this->cofi_map.print_edge_map(0);
-    this->cofi_map.mark_trace_node(decoder.control_flows);
-    this->cofi_map.update_edge_count(decoder.control_flows);
+    this->cofi_map.print_edge_map(0); // 0 valid, 1 count
+    this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
+    this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
+
+    //if (new_indirect_edge){
+    	this->cofi_map.target_backward_search(this->target_addr);
+    	this->cofi_map.update_probability();
+    //}
     
-    this->cofi_map.target_backward_search(this->target_addr);
 	this->cofi_map.score_back_path();
 
 
-    this->cofi_map.clear_trace_node();
+    this->cofi_map.clear_mini_trace();
 
 
 #ifdef DEBUG
@@ -248,6 +252,7 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
 }
 
+/*
 pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode) {
     if(!this->trace->stop_trace()){
         cerr << "stop PT event failed." << endl;
@@ -269,7 +274,7 @@ pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_in
     num_runs ++;
     return decoder;
 }
-
+*/
 
 
 
@@ -291,6 +296,9 @@ extern "C" {
 	void start_pt_fuzzer(int pid){
 	    the_fuzzer->start_pt_trace(pid);
 	    the_fuzzer->start = chrono::steady_clock::now();
+	}
+	void update_edge_probability(){
+	    the_fuzzer->cofi_map.update_probability();
 	}
 
 	void stop_pt_fuzzer(uint8_t *trace_bits){

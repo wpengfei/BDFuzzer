@@ -8119,36 +8119,6 @@ int main(int argc, char** argv) {
   printf("init pt fuzzer.\n");
   uint64_t target_addr = 0x40063d;
   init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
-/*
-  if(perf_init() == false)
-  {
-    printf("Initial perf failed\n");
-    exit(1);
-  }
-  
-  //read min_max.txt
-  if(read_min_max() == false)
-  {
-	  printf("Open min_max.txt Falied!");
-      exit(1);
-  }
-  
-  // read raw_bin from file
-  if(read_raw_bin() == false)
-  {
-	  printf("Error:Open raw_bin.txt file fail!\n");
-	  exit(1);
-  }
-  
-  //init decoder and disassembler
-  run.decoder = pt_decoder_init(raw_bin_buf, min_addr_cle, max_addr_cle, entry_point_cle, &pt_bitmap);
-  if(run.decoder == NULL)
-  {
-		printf("Decoder struct init failed!\n");\
-		exit(1);
-  }
-
-*/
 
 #ifdef DEBUG
   std::cout << "before wrmsr" << std::endl;
