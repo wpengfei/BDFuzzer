@@ -28,7 +28,6 @@ void* decoder_thread(void* p)
 }
 int main(int argc, char** argv)
 {
-    std::cout << "Enter cpp==> "<< std::endl;
     if(argc <= 6) {
         std::cout << argv[0] << " <raw_bin> <min_addr> <max_addr> <entry_point> <target_addr> <cmd_line>" << std::endl;
         exit(0);

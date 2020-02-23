@@ -756,11 +756,15 @@ double my_cofi_map::score_back_path(void){
             x = search_result[i][j];
             y = search_result[i][j+1];
             pp = pp*edge_map[x][y].p;
+            #ifdef DEBUG
             printf("%d->%d: %f\n", x, y, pp );
+            #endif
         }
         if (pp > max)
             max = pp;
+        #ifdef DEBUG
         printf("[score_back_path]----max prabability is: %f\n",max);
+        #endif
     }
     return max;
 }

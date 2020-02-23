@@ -101,7 +101,8 @@ EXP_ST u8 *in_dir,                    /* Input directory with test cases  */
           *in_bitmap,                 /* Input bitmap                     */
           *doc_path,                  /* Path to documentation dir        */
           *target_path,               /* Path to target binary            */
-          *orig_cmdline;              /* Original command line            */
+          *orig_cmdline,              /* Original command line            */
+          *targets_dir;               //** targets file
 
 EXP_ST u32 exec_tmout = EXEC_TIMEOUT; /* Configurable exec timeout (ms)   */
 static u32 hang_tmout = EXEC_TIMEOUT; /* Timeout used for hang det (ms)   */
@@ -8012,7 +8013,7 @@ int main(int argc, char** argv) {
   uint64_t min_addr = 0;
   uint64_t entry_point = 0;
 
-  while ((opt = getopt(argc, argv, "+i:o:f:m:t:T:dnCB:S:M:x:Q:r:l:h:e:")) > 0)
+  while ((opt = getopt(argc, argv, "+i:o:X:f:m:t:T:dnCB:S:M:x:Q:r:l:h:e:")) > 0)
 
     switch (opt) {
 
@@ -8020,7 +8021,7 @@ int main(int argc, char** argv) {
 
         if (in_dir) FATAL("Multiple -i options not supported");
         in_dir = optarg;
-
+        printf("in_dir:%s\n", in_dir);
         if (!strcmp(in_dir, "-")) in_place_resume = 1;
 
         break;
@@ -8029,6 +8030,14 @@ int main(int argc, char** argv) {
 
         if (out_dir) FATAL("Multiple -o options not supported");
         out_dir = optarg;
+        printf("out_dir:%s\n", out_dir);
+        break;
+
+      case 'X': /* targets file */
+
+        if (targets_dir) FATAL("Multiple -X options not supported");
+        targets_dir = optarg;
+        printf("targets_dir:%s\n", targets_dir);
         break;
 
       case 'M': { /* master sync ID */
@@ -8261,8 +8270,27 @@ int main(int argc, char** argv) {
 
   //initial perf
   printf("init pt fuzzer.\n");
-  uint64_t target_addr = 0x4006a4;
-  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
+  //uint64_t target_addr = 0x4006a4;
+
+  uint64_t targets[10], i = 0;  // at most 10 targets
+  FILE *fp;            
+  uint8_t len = 0;
+  if((fp = fopen(targets_dir,"r")) == NULL)
+  {
+    printf("open target file error!\n");
+    exit (0) ;
+  }
+  while(i<10){
+    fscanf(fp,"%x\n", &targets[i]);
+    printf("target[%d]%x\n", i, targets[i]);
+    if (targets[i] == 0 )
+      break;
+    i++;
+  }
+  len = i;
+  
+  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, targets[0]);
+
 
 #ifdef DEBUG
   std::cout << "before wrmsr" << std::endl;
