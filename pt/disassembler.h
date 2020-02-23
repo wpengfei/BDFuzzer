@@ -101,7 +101,7 @@ typedef struct _edge_t {
     bool is_unary; //is a single branch, e.g., unconditional direct jump
     uint64_t id; // unique ID used as hash value
     uint64_t count; // how many times this edge is executed.
-    double p; // the probability of taking this edge
+    float p; // the probability of taking this edge
 } edge_t;
 
 typedef map<uint64_t, basic_block_t*> bb_list_t;
@@ -202,8 +202,11 @@ public:
             return 0;
     }
     inline void update_edge_count(vector<uint64_t> cf){
-        //update count
-        assert(cf.size() >= 2);
+        if(cf.size()<2){
+            printf("cf.size:%d\n", cf.size());
+            assert(cf.size() >= 2);
+        }
+        
         uint64_t i, x, y;
         i = 0;
         while (i+1<cf.size()){

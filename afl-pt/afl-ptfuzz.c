@@ -147,6 +147,8 @@ static s32 forksrv_pid,               /* PID of the fork server           */
            out_dir_fd = -1;           /* FD of the lock file              */
 
 EXP_ST u8* trace_bits;                /* SHM with instrumentation bitmap  */
+EXP_ST float p_score = 0;                 //** get from probability calculation
+EXP_ST float dp = 0;                      //** percentage of testcases labeled as directed.
 
 EXP_ST u8  virgin_bits[MAP_SIZE],     /* Regions yet untouched by fuzzing */
            virgin_tmout[MAP_SIZE],    /* Bits we haven't seen in tmouts   */
@@ -175,7 +177,10 @@ EXP_ST u32 queued_paths,              /* Total number of queued testcases */
            useless_at_start,          /* Number of useless starting paths */
            var_byte_count,            /* Bitmap bytes with var behavior   */
            current_entry,             /* Current queue entry ID           */
-           havoc_div = 1;             /* Cycle count divisor for havoc    */
+           havoc_div = 1,             /* Cycle count divisor for havoc    */
+           top_directed_len = 0,      //** length of the top_directed queue.
+           queued_directed = 0,       //** number of the directed seeds in the queue.
+           pending_directed = 0;      //** Pending directed paths
 
 EXP_ST u64 total_crashes,             /* Total number of crashes          */
            unique_crashes,            /* Crashes with unique signatures   */
@@ -194,7 +199,9 @@ EXP_ST u64 total_crashes,             /* Total number of crashes          */
            bytes_trim_in,             /* Bytes coming into the trimmer    */
            bytes_trim_out,            /* Bytes coming outa the trimmer    */
            blocks_eff_total,          /* Blocks subject to effector maps  */
-           blocks_eff_select;         /* Blocks selected as fuzzable      */
+           blocks_eff_select,         /* Blocks selected as fuzzable      */
+           cycles_no_finds = 0;       //** number of cycles without new finds.
+           preferred_directed_num = 0;         //** number of "p-score > 0" seeds
 
 static u32 subseq_tmouts;             /* Number of timeouts in a row      */
 
@@ -247,7 +254,8 @@ struct queue_entry {
       has_new_cov,                    /* Triggers new coverage?           */
       var_behavior,                   /* Variable behavior?               */
       favored,                        /* Currently favored?               */
-      fs_redundant;                   /* Marked as redundant in the fs?   */
+      fs_redundant,                   /* Marked as redundant in the fs?   */
+      directed;                       //** whether the testcase is used for directed search ?
 
   u32 bitmap_size,                    /* Number of bits set in bitmap     */
       exec_cksum;                     /* Checksum of the execution trace  */
@@ -259,15 +267,19 @@ struct queue_entry {
   u8* trace_mini;                     /* Trace bytes, if kept             */
   u32 tc_ref;                         /* Trace bytes ref count            */
 
+  float p_score;                      //** the p_score value 
+
   struct queue_entry *next,           /* Next element, if any             */
-                     *next_100;       /* 100 elements ahead               */
+                     *next_100,       /* 100 elements ahead               */
+                     *next_directed;    //** next directed element, in a sorted manner.
 
 };
 
 static struct queue_entry *queue,     /* Fuzzing queue (linked list)      */
                           *queue_cur, /* Current offset within the queue  */
                           *queue_top, /* Top of the list                  */
-                          *q_prev100; /* Previous 100 marker              */
+                          *q_prev100, /* Previous 100 marker              */
+                          *top_directed;  //** a queue for the directed testecases, sorted by p-score.
 
 static struct queue_entry*
   top_rated[MAP_SIZE];                /* Top entries for bitmap bytes     */
@@ -788,11 +800,14 @@ static void mark_as_redundant(struct queue_entry* q, u8 state) {
 static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   struct queue_entry* q = ck_alloc(sizeof(struct queue_entry));
+  
 
   q->fname        = fname;
   q->len          = len;
   q->depth        = cur_depth + 1;
   q->passed_det   = passed_det;
+  q->p_score      = p_score; //** global value get from run_target();
+  q->directed = 0; //** set later.
 
   if (q->depth > max_depth) max_depth = q->depth;
 
@@ -800,13 +815,68 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
     queue_top->next = q;
     queue_top = q;
+    //**************************************************
+    if (q->p_score != 0) //** check float to int detail
+      if (!top_directed) //** empty queue
+        top_directed = q;
+      else if (!top_directed->next_directed){ //** has only one element
+        if(q->p_score > top_directed->p_score){
+          q->next_directed = top_directed;
+          top_directed = q;
+        }
+        else
+          top_directed->next_directed = q;
+      }
+      else{ //** at least two elements
+        u8 inserted = 0;
+        if(q->p_score > top_directed->p_score){
+          q->next_directed = top_directed;
+          top_directed = q;
+          inserted = 1;
+        }
 
-  } else q_prev100 = queue = queue_top = q;
+        if (!inserted){
+          struct queue_entry *tmp1, *tmp2;
+          tmp1 = top_directed; 
+          tmp2 = top_directed->next_directed;
 
+          while(tmp2){
+            if (q->p_score > tmp2->p_score){
+              tmp1->next_directed = q;
+              q->next_directed = tmp2;
+              inserted = 1;
+              break;
+            }
+            else{
+              tmp1 = tmp2;
+              tmp2 = tmp2->next_directed;
+            }
+          }
+          if(!inserted){
+            tmp2->next_directed = q; // append q
+          }
+
+      }
+      top_directed_len++;
+      //****************************************************
+    }
+
+  } else {
+    q_prev100 = queue = queue_top = q;
+    if (q->p_score != 0 && !top_directed){ //** check float to int detail
+      top_directed = q;
+      top_directed_len++;
+    }
+
+  }
   queued_paths++;
   pending_not_fuzzed++;
 
   cycles_wo_finds = 0;
+  cycles_no_finds = 0; //** to calculate dp
+
+  if (p_score > 0)
+    preferred_directed_num++; // number of p-score > 0 in a cycle
 
   if (!(queued_paths % 100)) {
 
@@ -818,6 +888,8 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   last_path_time = get_cur_time();
 
 }
+
+
 
 
 /* Destroy the entire queue. */
@@ -1300,7 +1372,8 @@ static void cull_queue(void) {
 
   struct queue_entry* q;
   static u8 temp_v[MAP_SIZE >> 3];
-  u32 i;
+  u32 i, selected_num;
+  float tmp;
 
   if (dumb_mode || !score_changed) return;
 
@@ -1311,12 +1384,60 @@ static void cull_queue(void) {
   queued_favored  = 0;
   pending_favored = 0;
 
+  queued_directed = 0;//**
+  pending_directed = 0;//**
+
   q = queue;
 
   while (q) {
     q->favored = 0;
+    q->directed = 0; //** erease for evey cycle
     q = q->next;
   }
+
+  //******************************************************
+  //**Process top_directed to label directed,
+  //**The directed entries are given more air time 
+  //**during all fuzzing steps
+  //
+  printf("[cull_queue]queued_paths %d\n",queued_paths);
+  printf("[cull_queue]top_directed_len %d\n",top_directed_len);
+
+  //dp = 0.3; //** for temp
+  tmp = queued_paths*dp;
+  
+  if(tmp > 0 && tmp < 1)
+    queued_directed = 1;
+  else if (tmp > 1)
+    queued_directed = (u32)tmp;
+  else
+    queued_directed = 0;
+
+  printf("[cull_queue]selected_num %d\n",selected_num);
+  struct queue_entry *p;
+  p = top_directed;
+
+  if (queued_directed > top_directed_len){
+    while(p){ //**select all directed testcases
+      p->directed = 1;
+      if(!p->was_fuzzed)
+        pending_directed++;
+      p = p->next_directed;
+    }
+    queued_directed = top_directed_len;
+  }
+  else{
+    u32 i = queued_directed;
+    while(i > 0 && p){
+      p->directed = 1;
+      if(!p->was_fuzzed)
+        pending_directed++;
+      p = p->next_directed;
+      i--;
+    }
+  }
+  //*****************************************************
+
 
   /* Let's see if anything in the bitmap isn't captured in temp_v.
      If yes, and if it has a top_rated[] contender, let's use it. */
@@ -2397,6 +2518,10 @@ static u8 run_target(char** argv, u32 timeout) {
       if (waitpid(child_pid, &status, 0) <= 0) PFATAL("waitpid() failed");
       //memset(trace_bits, 0, MAP_SIZE);
       stop_pt_fuzzer(trace_bits);
+      p_score = get_p_score();
+
+      printf("[run_target] p_score:%f\n", p_score);
+
       close(aa_pipe_fd[0]);
       close(aa_pipe_fd[1]);
       //printf("这是父进程,进程标识符是%d\n",getpid());
@@ -2804,6 +2929,7 @@ static void perform_dry_run(char** argv) {
     close(fd);
 
     res = calibrate_case(argv, q, use_mem, 0, 1);
+    
     ck_free(use_mem);
 
     if (stop_soon) return;
@@ -3209,22 +3335,21 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
     /* Keep only if there are new bits in the map, add to queue for
        future fuzzing, etc. */
 
+  
     if (!(hnb = has_new_bits(virgin_bits))) {
       if (crash_mode) total_crashes++;
+
       return 0;
     }    
 
-#ifndef SIMPLE_FILES
+    #ifndef SIMPLE_FILES
+        fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
+                          describe_op(hnb));
+    #else
+        fn = alloc_printf("%s/queue/id_%06u", out_dir, queued_paths);
+    #endif /* ^!SIMPLE_FILES */
 
-    fn = alloc_printf("%s/queue/id:%06u,%s", out_dir, queued_paths,
-                      describe_op(hnb));
-
-#else
-
-    fn = alloc_printf("%s/queue/id_%06u", out_dir, queued_paths);
-
-#endif /* ^!SIMPLE_FILES */
-
+    
     add_to_queue(fn, len, 0);
 
     if (hnb == 2) {
@@ -4825,8 +4950,23 @@ static u32 calculate_score(struct queue_entry* q) {
 
   if (perf_score > HAVOC_MAX_MULT * 100) perf_score = HAVOC_MAX_MULT * 100;
 
-  return perf_score;
+  //adjustment based on p_score
+  if(q->p_score == 0 || q->p_score == 1)
+    perf_score *= 0.5;
+  else if(q->p_score > 0.8)  
+    perf_score *= 4;
+  else if(q->p_score > 0.6)  
+    perf_score *= 3;
+  else if(q->p_score > 0.4)  
+    perf_score *= 2.5;
+  else if(q->p_score > 0.2)  
+    perf_score *= 2;
+  else if(q->p_score > 0.1)  
+    perf_score *= 1.5;
+  else if(q->p_score > 0.05)  
+    perf_score *= 1.3;
 
+  return perf_score;
 }
 
 
@@ -5041,27 +5181,29 @@ static u8 fuzz_one(char** argv) {
 
 #else
 
-  if (pending_favored) {
+  if (pending_favored || pending_directed) {
 
     /* If we have any favored, non-fuzzed new arrivals in the queue,
        possibly skip to them at the expense of already-fuzzed or non-favored
        cases. */
 
-    if ((queue_cur->was_fuzzed || !queue_cur->favored) &&
+    /* ...when there are new, pending favorites, 99 */
+    if ((queue_cur->was_fuzzed || !queue_cur->favored && !queue_cur->directed) &&
         UR(100) < SKIP_TO_NEW_PROB) return 1;
+    //if (!queue_cur->directed && UR(100) < 90) return 1;
 
-  } else if (!dumb_mode && !queue_cur->favored && queued_paths > 10) {
+  } else if (!dumb_mode && !queue_cur->favored && !queue_cur->directed && queued_paths > 10) {
 
     /* Otherwise, still possibly skip non-favored cases, albeit less often.
        The odds of skipping stuff are higher for already-fuzzed inputs and
        lower for never-fuzzed entries. */
 
     if (queue_cycle > 1 && !queue_cur->was_fuzzed) {
-
+      /* ...no new favs, cur entry not fuzzed yet, 75 */  
       if (UR(100) < SKIP_NFAV_NEW_PROB) return 1;
 
     } else {
-
+      /* ...no new favs, cur entry already fuzzed, 95 */
       if (UR(100) < SKIP_NFAV_OLD_PROB) return 1;
 
     }
@@ -7839,6 +7981,8 @@ void last_free_memory()
 	//pt_decoder_destroy(run.decoder);
 }
 
+void schedule_seeds(struct queue_entry * queue_cur);
+
 #ifndef AFL_LIB
 
 /* Main entry point */
@@ -8117,7 +8261,7 @@ int main(int argc, char** argv) {
 
   //initial perf
   printf("init pt fuzzer.\n");
-  uint64_t target_addr = 0x40063d;
+  uint64_t target_addr = 0x4006a4;
   init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
 
 #ifdef DEBUG
@@ -8207,6 +8351,8 @@ int main(int argc, char** argv) {
 
     u8 skipped_fuzz;
 
+    schedule_seeds(queue_cur);
+
     cull_queue();
 
     if (!queue_cur) {
@@ -8215,6 +8361,7 @@ int main(int argc, char** argv) {
       current_entry     = 0;
       cur_skipped_paths = 0;
       queue_cur         = queue;
+      preferred_directed_num     = 0; // number of p-score > 0 in a cycle
 
       while (seek_to) {
         current_entry++;
@@ -8233,6 +8380,8 @@ int main(int argc, char** argv) {
          recombination strategies next. */
 
       if (queued_paths == prev_queued) {
+        
+        cycles_no_finds++; //** for dp
 
         if (use_splicing) cycles_wo_finds++; else use_splicing = 1;
 
@@ -8298,6 +8447,31 @@ stop_fuzzing:
 
   exit(0);
 
+}
+
+void schedule_seeds(struct queue_entry *queue_cur){
+  //** increase directed testcase percentage when no new find for a full queue cycle
+  float inc;
+
+  //** from exploration to exploitation gradually
+  if (!queue_cur && cycles_no_finds > 0 && dp <= 0.8)
+    dp = dp + 0.2;
+
+  if(p_score > 0) {  //** every time a p-score is found, increase dp
+    inc = 1/queued_paths;
+    if(dp + inc <= 1)
+      dp = dp + inc; 
+    else
+      dp = 1;
+  }
+
+  //** from exploitation back to exploration when exploration is at the bottleneck 
+
+  if (!queue_cur && cycles_no_finds > 0 && dp >= 0.95) //** no new path is covered for a full cycle
+      dp = dp/10;
+
+  if (!queue_cur && preferred_directed_num < 5 && dp >= 0.5) //** when few possible direction are found in a cycle
+      dp = dp/5;//preferred_directed_num/queued_path;
 }
 
 #endif /* !AFL_LIB */

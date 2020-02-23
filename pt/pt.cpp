@@ -85,7 +85,9 @@ bool pt_tracer::open_pt(int pt_perf_type) {
     struct perf_event_mmap_page* pem = (struct perf_event_mmap_page*)this->perf_pt_header;
     pem->aux_offset = pem->data_offset + pem->data_size;
     pem->aux_size = get_fuzzer_config().perf_aux_size;
+#ifdef DEBUG
     cout << "[pt_tracer::open_pt]pem->aux_offset = "<<hex<<pem->aux_offset<<"pem->aux_size = "<<hex<<pem->aux_size << endl;
+#endif
     this->perf_pt_aux = (uint8_t*)mmap(NULL, pem->aux_size, PROT_READ | PROT_WRITE, MAP_SHARED, perf_fd, pem->aux_offset);
     if (this->perf_pt_aux == MAP_FAILED) {
         munmap(this->perf_pt_aux, _HF_PERF_MAP_SZ + getpagesize());
@@ -98,7 +100,7 @@ bool pt_tracer::open_pt(int pt_perf_type) {
         return false;
     }
 
-    cout << "[pt_tracer::open_pt]begin_tracing set true" << endl;
+    //cout << "[pt_tracer::open_pt]begin_tracing set true" << endl;
     pt_ready = true; // to let the decoding thread know the tracing is begin and the data is available
 
 

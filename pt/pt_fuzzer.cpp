@@ -116,16 +116,19 @@ bool pt_fuzzer::build_cofi_map() {
     //cout << "first addr = " << cofi_map.begin()->first << endl;
     //cout << "last addr = " << (cofi_map.rbegin())->first << endl;
     //
+
+    cofi_map.construct_bb_list();
+    cofi_map.construct_edge_map();
     
 #ifdef DEBUG
     printf("----------cofi_map\n");
-    cofi_map.print_map_data();
+    //cofi_map.print_map_data();
     printf("----------bb_list\n");
-    cofi_map.construct_bb_list();
-    cofi_map.print_bb_list();
+    
+    //cofi_map.print_bb_list();
     printf("----------edge_map\n");
-    cofi_map.construct_edge_map();
-    cofi_map.print_edge_map(0);
+    
+    //cofi_map.print_edge_map(0);
 
 
 #endif  
@@ -208,24 +211,28 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
 
 
-    cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;
+    //cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
     decoder.decode(); // main phase to decode pt packets
 
-    this->cofi_map.print_edge_map(0); // 0 valid, 1 count
+#ifdef DEBUG
+    //this->cofi_map.print_edge_map(1); // 0 valid, 1 count 2 p
+    //this->cofi_map.print_edge_map(2); // 0 valid, 1 count 2 p
+#endif
+
     this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
     this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
 
     //if (new_indirect_edge){
-    	this->cofi_map.target_backward_search(this->target_addr);
-    	this->cofi_map.update_probability();
+    	//this->cofi_map.target_backward_search(this->target_addr); // deadlock
+    //this->cofi_map.update_probability();
     //}
     
-	this->cofi_map.score_back_path();
+	//this->cofi_map.score_back_path();// delete when ready
 
 
-    this->cofi_map.clear_mini_trace();
+    
 
 
 #ifdef DEBUG
@@ -242,7 +249,7 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
     FILE* f = fopen("../control_inst_flow.txt", "w");
     if(f != nullptr) {
-        cout << "[pt_fuzzer::stop_pt_trace]start to write control flow to file." << endl;
+        //cout << "[pt_fuzzer::stop_pt_trace]start to write control flow to file." << endl;
         decoder.dump_control_flows(f);
         fclose(f);
     }
@@ -297,10 +304,6 @@ extern "C" {
 	    the_fuzzer->start_pt_trace(pid);
 	    the_fuzzer->start = chrono::steady_clock::now();
 	}
-	void update_edge_probability(){
-	    the_fuzzer->cofi_map.update_probability();
-	}
-
 	void stop_pt_fuzzer(uint8_t *trace_bits){
 	    the_fuzzer->end = chrono::steady_clock::now();
 	    the_fuzzer->diff = the_fuzzer->end - the_fuzzer->start;
@@ -314,6 +317,22 @@ extern "C" {
 	#ifdef DEBUG
 	    cout << "Time of decode: " << the_fuzzer->diff.count()*1000000000 << endl;
 	#endif
+	}
+	void update_edge_probability(){
+	    the_fuzzer->cofi_map.update_probability();
+	}
+	float get_p_score(){
+		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->target_addr);
+		float p;
+		if (ret == 0 || ret == 1) // 0 cannot find a conversion path 
+			return (float)ret;           // trace goes through the target 
+		else{
+			// return the largest p score when there are more than one conversion path
+		    p = the_fuzzer->cofi_map.score_back_path(); 
+			the_fuzzer->cofi_map.clear_mini_trace();
+			return p;
+		}
+
 	}
 
 }

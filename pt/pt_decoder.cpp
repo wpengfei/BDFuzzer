@@ -375,7 +375,10 @@ uint64_t pt_packet_decoder::get_ip_val(unsigned char **pp, unsigned char *end, i
 }
 
 void pt_packet_decoder::dump_control_flows(FILE* f) {
+    #ifdef DEBUG
     cout << "dump control flow inst, total inst is: " << control_flows.size() << endl;
+    #endif
+    
     for(int i = 0; i < this->control_flows.size(); i ++) {
         fprintf(f, "%p\n", control_flows[i]);
     }
