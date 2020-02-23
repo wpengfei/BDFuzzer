@@ -202,7 +202,7 @@ EXP_ST u64 total_crashes,             /* Total number of crashes          */
            blocks_eff_total,          /* Blocks subject to effector maps  */
            blocks_eff_select,         /* Blocks selected as fuzzable      */
            cycles_no_finds = 0;       //** number of cycles without new finds.
-           preferred_directed_num = 0;         //** number of "p-score > 0" seeds
+           cycle_directed_num = 0;    //** number of "p-score > 0" seeds in a cycle
 
 static u32 subseq_tmouts;             /* Number of timeouts in a row      */
 
@@ -877,7 +877,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   cycles_no_finds = 0; //** to calculate dp
 
   if (p_score > 0)
-    preferred_directed_num++; // number of p-score > 0 in a cycle
+    cycle_directed_num++; // number of p-score > 0 in a cycle
 
   if (!(queued_paths % 100)) {
 
@@ -1404,15 +1404,16 @@ static void cull_queue(void) {
   printf("[cull_queue]queued_paths %d\n",queued_paths);
   printf("[cull_queue]top_directed_len %d\n",top_directed_len);
 
-  //dp = 0.3; //** for temp
-  tmp = queued_paths*dp;
-  
-  if(tmp > 0 && tmp < 1)
-    queued_directed = 1;
-  else if (tmp > 1)
-    queued_directed = (u32)tmp;
-  else
+  // when path is few, do not try directed.
+  if (queued_paths <= 10) 
     queued_directed = 0;
+  else{
+    tmp = queued_paths*dp;
+    if(tmp <= 1)
+      queued_directed = 1;
+    else
+      queued_directed = (u32)tmp;
+  }
 
   printf("[cull_queue]selected_num %d\n",selected_num);
   struct queue_entry *p;
@@ -2521,7 +2522,7 @@ static u8 run_target(char** argv, u32 timeout) {
       stop_pt_fuzzer(trace_bits);
       p_score = get_p_score();
 
-      printf("[run_target] p_score:%f\n", p_score);
+      //printf("[run_target] p_score:%f\n", p_score);
 
       close(aa_pipe_fd[0]);
       close(aa_pipe_fd[1]);
@@ -4391,6 +4392,18 @@ static void show_stats(void) {
 
   SAYF (bSTG bV bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
 
+  SAYF(bV bSTOP " dp value : " cRST "%-24s " bSTG bV bSTOP
+         " top_directed len  : %s%-18s " bSTG bV "\n", DF(dp), cRST,
+         DI(top_directed_len));
+
+  SAYF(bV bSTOP " cycle_directed_num : " cRST "%-14s " bSTG bV bSTOP
+         "seed queue len  : %s%-21s " bSTG bV "\n", DI(cycle_directed_num), cRST,
+         DI(queued_paths));
+
+
+  //SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG bV bSTOP
+  //       "   new crashes : %s%-22s " bSTG bV "\n", DI(total_execs),
+  //      unique_crashes ? cLRD : cRST, tmp);
   /* Aaaalmost there... hold on! */
 
   SAYF(bVR bH cCYA bSTOP " fuzzing strategy yields " bSTG bH10 bH bHT bH10
@@ -4495,6 +4508,7 @@ static void show_stats(void) {
 
   SAYF(bV bSTOP "        trim : " cRST "%-37s " bSTG bVR bH20 bH2 bH2 bRB "\n"
        bLB bH30 bH20 bH2 bH bRB bSTOP cRST RESET_G1, tmp);
+
 
   /* Provide some CPU utilization stats. */
 
@@ -8288,7 +8302,7 @@ int main(int argc, char** argv) {
     i++;
   }
   len = i;
-  
+
   init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, targets[0]);
 
 
@@ -8389,7 +8403,7 @@ int main(int argc, char** argv) {
       current_entry     = 0;
       cur_skipped_paths = 0;
       queue_cur         = queue;
-      preferred_directed_num     = 0; // number of p-score > 0 in a cycle
+      cycle_directed_num     = 0; // number of p-score > 0 in a cycle
 
       while (seek_to) {
         current_entry++;
@@ -8498,8 +8512,8 @@ void schedule_seeds(struct queue_entry *queue_cur){
   if (!queue_cur && cycles_no_finds > 0 && dp >= 0.95) //** no new path is covered for a full cycle
       dp = dp/10;
 
-  if (!queue_cur && preferred_directed_num < 5 && dp >= 0.5) //** when few possible direction are found in a cycle
-      dp = dp/5;//preferred_directed_num/queued_path;
+  if (!queue_cur && cycle_directed_num < 5 && dp >= 0.5) //** when few possible direction are found in a cycle
+      dp = dp/5;//cycle_directed_num/queued_path;
 }
 
 #endif /* !AFL_LIB */

@@ -639,13 +639,17 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
         else if (mini_trace[cur] == 1){
             vector<uint64_t> cur_path;
             for(uint64_t n = 0; n < path.size(); n++){
+                #ifdef DEBUG
                 printf("%d->", path[n]);
+                #endif
                 cur_path.push_back(path[n]);
             }
             cur_path.push_back(cur);
             search_result.push_back(cur_path);
             ret++; // return the num of path found
+            #ifdef DEBUG
             printf("%d\n",cur);
+            #endif
 
             pos[cur] = 0; // erease
             cur = path.back();//step back
