@@ -290,6 +290,7 @@ private:
             uint64_t cofi = cofi_map.get_cofi_addr(tip);
 
             cofi_map.add_edge(last_cofi, cofi);
+            update_tracebits(last_cofi, cofi);
             
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
@@ -324,6 +325,7 @@ private:
             uint64_t cofi = cofi_map.get_cofi_addr(tip);
 
             cofi_map.add_edge(last_cofi, cofi);
+            update_tracebits(last_cofi, cofi);
             
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
@@ -420,7 +422,13 @@ private:
     void flush();
     uint32_t decode_tnt(uint64_t entry_point); // for TNT mode only
     uint32_t decode_fake_tnt(uint64_t entry_point); // for FAKE_TNT mode only
-    void decode_tip(uint64_t tip); // for TIP mode only
+    void decode_tip(uint64_t tip); // for TIP mode 
+    inline void update_tracebits(uint64_t from, uint64_t to){
+        uint16_t pos16 = (uint16_t)cofi_map.get_edge_id(from, to);
+        //cout << "[update_tracebits]get_edge_id: " << pos16 << endl;
+        trace_bits[pos16]++;
+    }
+    /*
     inline void alter_bitmap(uint64_t cur_cofi) {
 
         //control_flows.push_back(cur_cofi);
@@ -430,11 +438,12 @@ private:
         }
         else{
             uint16_t pos16 = (uint16_t)cofi_map.get_edge_id(bitmap_last_cofi, cur_cofi);
+            cout << "[alter_bitmap]get_edge_id: " << pos16 << endl;
             trace_bits[pos16]++;
             bitmap_last_cofi = cur_cofi;
         }
 
-    }
+    }*/
 protected:
     cofi_inst_t* get_cofi_obj(uint64_t addr);
     

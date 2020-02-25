@@ -202,7 +202,7 @@ EXP_ST u64 total_crashes,             /* Total number of crashes          */
            blocks_eff_total,          /* Blocks subject to effector maps  */
            blocks_eff_select,         /* Blocks selected as fuzzable      */
            cycles_no_finds = 0;       //** number of cycles without new finds.
-           cycle_directed_num = 0;    //** number of "p-score > 0" seeds in a cycle
+           directed_in_cycle = 0;    //** number of "p-score > 0" seeds in a cycle
 
 static u32 subseq_tmouts;             /* Number of timeouts in a row      */
 
@@ -802,6 +802,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   struct queue_entry* q = ck_alloc(sizeof(struct queue_entry));
   
+  printf("[add to queue] p_score: %f\n", p_score);
 
   q->fname        = fname;
   q->len          = len;
@@ -817,16 +818,21 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
     queue_top->next = q;
     queue_top = q;
     //**************************************************
-    if (q->p_score != 0) //** check float to int detail
-      if (!top_directed) //** empty queue
+    if (q->p_score != 0){ //** check float to int detail
+      if (!top_directed){ //** empty queue
         top_directed = q;
+        //printf("debug0\n");
+      }
       else if (!top_directed->next_directed){ //** has only one element
         if(q->p_score > top_directed->p_score){
           q->next_directed = top_directed;
           top_directed = q;
+          //printf("debug1\n");
         }
-        else
+        else{
           top_directed->next_directed = q;
+          //printf("debug2\n");
+        }
       }
       else{ //** at least two elements
         u8 inserted = 0;
@@ -834,39 +840,44 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
           q->next_directed = top_directed;
           top_directed = q;
           inserted = 1;
+          //printf("debug3\n");
         }
 
         if (!inserted){
           struct queue_entry *tmp1, *tmp2;
           tmp1 = top_directed; 
           tmp2 = top_directed->next_directed;
-
+          //printf("debug4\n");
           while(tmp2){
             if (q->p_score > tmp2->p_score){
               tmp1->next_directed = q;
               q->next_directed = tmp2;
               inserted = 1;
+              //printf("debug5\n");
               break;
             }
             else{
               tmp1 = tmp2;
               tmp2 = tmp2->next_directed;
+              //printf("debug6\n");
             }
           }
           if(!inserted){
-            tmp2->next_directed = q; // append q
+            tmp1->next_directed = q; // append q
+            //printf("debug7\n");
           }
-
+        }
       }
       top_directed_len++;
       //****************************************************
     }
-
-  } else {
+  } 
+  else {
     q_prev100 = queue = queue_top = q;
     if (q->p_score != 0 && !top_directed){ //** check float to int detail
       top_directed = q;
       top_directed_len++;
+      //printf("debug8\n");
     }
 
   }
@@ -877,7 +888,7 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
   cycles_no_finds = 0; //** to calculate dp
 
   if (p_score > 0)
-    cycle_directed_num++; // number of p-score > 0 in a cycle
+    directed_in_cycle++; // number of p-score > 0 in a cycle
 
   if (!(queued_paths % 100)) {
 
@@ -1401,21 +1412,21 @@ static void cull_queue(void) {
   //**The directed entries are given more air time 
   //**during all fuzzing steps
   //
-  printf("[cull_queue]queued_paths %d\n",queued_paths);
-  printf("[cull_queue]top_directed_len %d\n",top_directed_len);
+  //printf("[cull_queue]queued_paths %d\n",queued_paths);
+  //printf("[cull_queue]top_directed_len %d\n",top_directed_len);
 
-  // when path is few, do not try directed.
-  if (queued_paths <= 10) 
+  // when path is not enough, do not try directed.
+  if (queued_paths < 3) 
     queued_directed = 0;
   else{
     tmp = queued_paths*dp;
-    if(tmp <= 1)
+    if(tmp <= 1 && tmp > 0)
       queued_directed = 1;
     else
       queued_directed = (u32)tmp;
   }
 
-  printf("[cull_queue]selected_num %d\n",selected_num);
+  //printf("[cull_queue]queued_directed %d\n",queued_directed);
   struct queue_entry *p;
   p = top_directed;
 
@@ -2521,8 +2532,8 @@ static u8 run_target(char** argv, u32 timeout) {
       //memset(trace_bits, 0, MAP_SIZE);
       stop_pt_fuzzer(trace_bits);
       p_score = get_p_score();
-
-      //printf("[run_target] p_score:%f\n", p_score);
+      //u32 cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+      //printf("[run_target] p_score:%f, trace_bits_hash: %x\n", p_score, cksum);
 
       close(aa_pipe_fd[0]);
       close(aa_pipe_fd[1]);
@@ -4396,9 +4407,9 @@ static void show_stats(void) {
          " top_directed len  : %s%-18s " bSTG bV "\n", DF(dp), cRST,
          DI(top_directed_len));
 
-  SAYF(bV bSTOP " cycle_directed_num : " cRST "%-14s " bSTG bV bSTOP
-         "seed queue len  : %s%-21s " bSTG bV "\n", DI(cycle_directed_num), cRST,
-         DI(queued_paths));
+  SAYF(bV bSTOP " directed_in_cycle : " cRST "%-14s " bSTG bV bSTOP
+         "queued_directed num  : %s%-21s " bSTG bV "\n", DI(directed_in_cycle), cRST,
+         DI(queued_directed));
 
 
   //SAYF(bV bSTOP " total execs : " cRST "%-21s " bSTG bV bSTOP
@@ -5203,8 +5214,11 @@ static u8 fuzz_one(char** argv) {
        cases. */
 
     /* ...when there are new, pending favorites, 99 */
-    if ((queue_cur->was_fuzzed || !queue_cur->favored && !queue_cur->directed) &&
-        UR(100) < SKIP_TO_NEW_PROB) return 1;
+    if ((queue_cur->was_fuzzed || (!queue_cur->favored && !queue_cur->directed)) &&
+        UR(100) < SKIP_TO_NEW_PROB) {
+        printf("skiped1\n");
+        return 1;
+      }
     //if (!queue_cur->directed && UR(100) < 90) return 1;
 
   } else if (!dumb_mode && !queue_cur->favored && !queue_cur->directed && queued_paths > 10) {
@@ -5215,12 +5229,17 @@ static u8 fuzz_one(char** argv) {
 
     if (queue_cycle > 1 && !queue_cur->was_fuzzed) {
       /* ...no new favs, cur entry not fuzzed yet, 75 */  
-      if (UR(100) < SKIP_NFAV_NEW_PROB) return 1;
+      if (UR(100) < SKIP_NFAV_NEW_PROB) {
+        printf("skiped2\n");
+        return 1;
+      }
 
     } else {
       /* ...no new favs, cur entry already fuzzed, 95 */
-      if (UR(100) < SKIP_NFAV_OLD_PROB) return 1;
-
+      if (UR(100) < SKIP_NFAV_OLD_PROB) {
+        printf("skiped3\n");
+        return 1;
+      }
     }
 
   }
@@ -8403,7 +8422,7 @@ int main(int argc, char** argv) {
       current_entry     = 0;
       cur_skipped_paths = 0;
       queue_cur         = queue;
-      cycle_directed_num     = 0; // number of p-score > 0 in a cycle
+      directed_in_cycle     = 0; // number of p-score > 0 in a cycle
 
       while (seek_to) {
         current_entry++;
@@ -8496,7 +8515,7 @@ void schedule_seeds(struct queue_entry *queue_cur){
   float inc;
 
   //** from exploration to exploitation gradually
-  if (!queue_cur && cycles_no_finds > 0 && dp <= 0.8)
+  if (!queue_cur && cycles_no_finds > 100 && dp <= 0.8)
     dp = dp + 0.2;
 
   if(p_score > 0) {  //** every time a p-score is found, increase dp
@@ -8512,8 +8531,8 @@ void schedule_seeds(struct queue_entry *queue_cur){
   if (!queue_cur && cycles_no_finds > 0 && dp >= 0.95) //** no new path is covered for a full cycle
       dp = dp/10;
 
-  if (!queue_cur && cycle_directed_num < 5 && dp >= 0.5) //** when few possible direction are found in a cycle
-      dp = dp/5;//cycle_directed_num/queued_path;
+  if (!queue_cur && directed_in_cycle < 5 && dp >= 0.5) //** when few possible direction are found in a cycle
+      dp = dp/5;//directed_in_cycle/queued_path;
 }
 
 #endif /* !AFL_LIB */

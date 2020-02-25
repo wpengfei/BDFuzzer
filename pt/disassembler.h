@@ -157,7 +157,7 @@ public:
         return map_data[tip-base_address]->inst_addr;
     }
     inline uint64_t get_unique_id(void){
-        return ++unique_id;
+        return ++unique_id; // unique_id!=0
     }
     inline void set(uint64_t addr, cofi_inst_t* cofi_obj) {
         assert(addr >= base_address && addr < base_address + code_size);

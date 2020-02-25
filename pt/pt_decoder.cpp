@@ -173,7 +173,7 @@ void pt_packet_decoder::decode_tip(uint64_t tip) {
     cofi_inst_t* cofi_obj = get_cofi_obj(tip);
     //cout <<BOLDYELLOW<< "[pt_packet_decoder::decode_tip] tip: "<<hex<< tip<<
                  //" cofi_obj->inst_addr: "<<hex<<cofi_obj->inst_addr<<RESET<< endl;
-    alter_bitmap(cofi_obj->inst_addr);
+    //alter_bitmap(cofi_obj->inst_addr);
     
 }
 
@@ -244,6 +244,8 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                         assert(cofi_obj->target_addr != 0);
 
                         uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
+                        cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);
+                        update_tracebits(cofi_obj->inst_addr, target_cofi);
                         
                         if (control_flows.size()==0)
                             control_flows.push_back(cofi_obj->inst_addr);
@@ -264,7 +266,9 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << hex <<cofi_obj->inst_addr << " NOT_TAKEN, next = " << cofi_obj->next_cofi->inst_addr <<RESET<< endl;
 #endif            
                     uint64_t next_cofi = cofi_obj->next_cofi->inst_addr;
-                    
+                    cofi_map.add_edge(cofi_obj->inst_addr, next_cofi);
+                    update_tracebits(cofi_obj->inst_addr, next_cofi);
+
                     if (control_flows.size()==0)
                         control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(next_cofi);
@@ -293,7 +297,9 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     assert(cofi_obj->target_addr != 0);
 
                     uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
-                    
+                    cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);
+                    update_tracebits(cofi_obj->inst_addr, target_cofi);
+
                     if (control_flows.size()==0)
                         control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(target_cofi);
@@ -336,8 +342,10 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
         }
         num_tnt_decoded ++;
         this->num_decoded_branch ++;
-        if(cofi_obj != nullptr)
+        
+        /*if(cofi_obj != nullptr)
             alter_bitmap(cofi_obj->inst_addr);
+            */
     }
 
     return num_tnt_decoded;
@@ -378,7 +386,7 @@ void pt_packet_decoder::dump_control_flows(FILE* f) {
     #ifdef DEBUG
     cout << "dump control flow inst, total inst is: " << control_flows.size() << endl;
     #endif
-    
+
     for(int i = 0; i < this->control_flows.size(); i ++) {
         fprintf(f, "%p\n", control_flows[i]);
     }

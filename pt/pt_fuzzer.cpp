@@ -224,16 +224,6 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
     this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
     this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
 
-    //if (new_indirect_edge){
-    	//this->cofi_map.target_backward_search(this->target_addr); // deadlock
-    //this->cofi_map.update_probability();
-    //}
-    
-	//this->cofi_map.score_back_path();// delete when ready
-
-
-    
-
 
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << endl;
