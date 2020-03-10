@@ -181,7 +181,7 @@ EXP_ST u32 queued_paths,              /* Total number of queued testcases */
            current_entry,             /* Current queue entry ID           */
            havoc_div = 1,             /* Cycle count divisor for havoc    */
            top_directed_len = 0,      //** length of the top_directed queue.
-           queued_directed_num = 0,   //** number of the directed seeds in the queue.
+           queued_directed = 0,   //** number of the directed seeds in the queue.
            pending_directed = 0;      //** Pending directed paths
 
 EXP_ST u64 total_crashes,             /* Total number of crashes          */
@@ -1402,7 +1402,7 @@ static void cull_queue(void) {
   queued_favored  = 0;
   pending_favored = 0;
 
-  queued_directed_num = 0;//**
+  queued_directed = 0;//**
   pending_directed = 0;//**
 
   q = queue;
@@ -1424,30 +1424,30 @@ static void cull_queue(void) {
   // when path is not enough, do not try directed.
   assert(dp <= 1);
   if (queued_paths < 3) 
-    queued_directed_num = 0;
+    queued_directed = 0;
   else{
     tmp = queued_paths * dp;
     if(tmp <= 1 && tmp > 0)
-      queued_directed_num = 1;
+      queued_directed = 1;
     else
-      queued_directed_num = (u32)tmp;
+      queued_directed = (u32)tmp;
   }
 
-  //printf("[cull_queue]queued_directed_num %d\n",queued_directed_num);
+  //printf("[cull_queue]queued_directed %d\n",queued_directed);
   struct queue_entry *p;
   p = top_directed;
 
-  if (queued_directed_num > top_directed_len){
+  if (queued_directed > top_directed_len){
     while(p){ //**select all directed testcases
       p->directed = 1;
       if(!p->was_fuzzed)
         pending_directed++;
       p = p->next_directed;
     }
-    queued_directed_num = top_directed_len;
+    queued_directed = top_directed_len;
   }
   else{
-    u32 i = queued_directed_num;
+    u32 i = queued_directed;
     while(i > 0 && p){
       p->directed = 1;
       if(!p->was_fuzzed)
@@ -4415,8 +4415,8 @@ static void show_stats(void) {
          DI(top_directed_len));
 
   SAYF(bV bSTOP " dp value : " cRST "%-24s " bSTG bV bSTOP
-         " queued_directed_num  : %s%-15s " bSTG bV "\n", DF(dp), cRST,
-         DI(queued_directed_num));
+         " queued_directed  : %s%-15s " bSTG bV "\n", DF(dp), cRST,
+         DI(queued_directed));
 
   SAYF(bV bSTOP cRST "%-40s " bSTG bV bSTOP
          " pending_directed  : %s%-17s " bSTG bV "\n", cRST,
@@ -6883,6 +6883,7 @@ abandon_entry:
     queue_cur->was_fuzzed = 1;
     pending_not_fuzzed--;
     if (queue_cur->favored) pending_favored--;
+    if (queue_cur->directed) pending_directed--;//**
   }
 
   munmap(orig_in, queue_cur->len);
@@ -8034,14 +8035,48 @@ void last_free_memory()
 }
 
 void schedule_seeds(struct queue_entry *queue_cur){
-  //** increase directed testcase percentage when no new find for a full queue cycle
-  float inc;
+  /*
+  pending_not_fuzzed,        // Queued but not done yet          
+  pending_favored,           // Pending favored paths     
+  pending_directed           // labeled as directed but not fuzzed       
+  queued_paths               // number of seed in the queue
+  queued_directed            // number of seeds in the queue are labeled directed
+  top_directed_len           // total number of seeds labeled as directed 
+  cycles_no_finds            // how many cycles we haven't found any new paths
+  cycles_with_finds          // number of cycles have new finds.
+  cycle_new_seed             // number of new seeds in a cycle
+  cycle_new_directed         // number of directed seeds newly added in a cycle.
+  */
 
-  if(queue_cur) // only adjust dp when a cycle is done
-    return;
+  //** increase directed testcase percentage when no new find for a full queue cycle
+  float inc, pp, pp1, pp2;
+
+
+  if (top_directed_len == 0){
+    dp = 0;
+    return ;
+  }
+
+  //base dp
+  if (pending_directed){
+    pp = pending_directed/queued_paths;
+    if (pp > dp){
+      assert(pp <= 1);
+      dp = pp;
+    }
+  }
+  if (pending_favored || pending_not_fuzzed){
+    pp1 = pending_favored/queued_paths;
+    pp2 = pending_not_fuzzed/queued_paths;
+    pp = pp1 > pp2? pp1:pp2;
+    if (pp > dp){
+      assert(pp <= 1);
+      dp = 1- pp;
+    }
+  }
 
   //** from exploration to exploitation gradually
-  if (cycles_no_finds > 100 && dp <= 0.8){
+  if (cycles_no_finds > 100 && dp <= 0.8 ){
     dp = dp + 0.2;
     cycles_no_finds = 0; //**wait for another 100 cycles
     printf("[schedule_seeds] dp + 0.2\n");
@@ -8059,16 +8094,16 @@ void schedule_seeds(struct queue_entry *queue_cur){
   }
 
    
-  //** from exploitation back to exploration when exploration is at the bottleneck 
+  //** from exploitation back to exploration 
 
-  if (cycles_no_finds > 0 && dp >= 0.95){ //** no new path is covered for a full cycle
+  if (cycles_no_finds > 2 && dp >= 0.9 && !pending_directed){ //** no new path is covered for a full cycle
       dp = dp/10;
       cycles_no_finds = 0;
       printf("[schedule_seeds] dp/10\n");
       return;
   }
 
-  if ( cycle_new_directed < 5 && dp >= 0.5){ //** when few possible direction are found in a cycle
+  if ( cycle_new_directed < 3 && dp >= 0.5 && !pending_directed){ //** when few possible direction are found in a cycle
       dp = dp/5;//cycle_new_directed/queued_path;
       printf("[schedule_seeds] dp/5\n");
       return;
@@ -8471,7 +8506,10 @@ int main(int argc, char** argv) {
 
     u8 skipped_fuzz;
 
-    schedule_seeds(queue_cur);
+    if (!queue_cur) {
+      // only adjust dp when a cycle is done
+      schedule_seeds(queue_cur);
+    }
 
     cull_queue();
 
