@@ -1,7 +1,7 @@
 #./config-run.sh
 
-#rm -rf test/output/ 
-#mkdir test/output/
+sudo rm -rf test/output/ 
+mkdir test/output/
 
 sudo rm -r build
 mkdir build
