@@ -39,6 +39,7 @@
 #include <vector>
 #include "disassembler.h"
 #include "pt_ext.h"
+#include <linux/timer.h>
 //~ #include "tnt_cache.h"
 
 /* Size (in bytes) for report data to be stored in stack before written to file */
@@ -284,7 +285,7 @@ private:
         decode_tip(tip);
         this->last_tip = tip;
 
-        if(this->last_target0!=0){
+        if(this->last_target0 != 0){
             //cofi_map.update_bb_list(this->last_target0, tip);
             uint64_t last_cofi = cofi_map.get_cofi_addr(last_target0);
             uint64_t cofi = cofi_map.get_cofi_addr(tip);
@@ -479,7 +480,7 @@ public:
     uint64_t target_addr;
 
     int32_t perfIntelPtPerfType = -1;
-    
+    uint8_t save_cf = 0;
 
     uint8_t* code;
 

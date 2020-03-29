@@ -1,3 +1,4 @@
+
 /*
    american fuzzy lop - fuzzer code
    --------------------------------
@@ -181,7 +182,7 @@ EXP_ST u32 queued_paths,              /* Total number of queued testcases */
            current_entry,             /* Current queue entry ID           */
            havoc_div = 1,             /* Cycle count divisor for havoc    */
            top_directed_len = 0,      //** length of the top_directed queue.
-           queued_directed = 0,   //** number of the directed seeds in the queue.
+           queued_directed = 0,       //** number of the directed seeds in the queue.
            pending_directed = 0;      //** Pending directed paths
 
 EXP_ST u64 total_crashes,             /* Total number of crashes          */
@@ -241,7 +242,7 @@ static s32 cpu_core_count;            /* CPU core count                   */
 
 #ifdef HAVE_AFFINITY
 
-static s32 cpu_aff = -1;       	      /* Selected CPU core                */
+static s32 cpu_aff = -1;              /* Selected CPU core                */
 
 #endif /* HAVE_AFFINITY */
 
@@ -806,14 +807,25 @@ static void add_to_queue(u8* fname, u32 len, u8 passed_det) {
 
   struct queue_entry* q = ck_alloc(sizeof(struct queue_entry));
   
-  printf("[add to queue] p_score: %f\n", p_score);
+  p_score = get_p_score(); //** global value get from run_target();
+  u32 cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
+
+  FILE* f;
 
   q->fname        = fname;
   q->len          = len;
   q->depth        = cur_depth + 1;
   q->passed_det   = passed_det;
-  q->p_score      = p_score; //** global value get from run_target();
-  q->directed = 0; //** set later.
+  q->p_score      = p_score;
+  q->directed     = 0; //** set later at cull_queue
+
+
+  f = fopen("pscore_trace.txt", "a+");
+
+  fprintf(f, "[add_to_queue] p_score:%f, trace_bits_hash: %x\n", q->p_score, cksum);
+
+  fclose(f);
+
 
   if (q->depth > max_depth) max_depth = q->depth;
 
@@ -1421,39 +1433,42 @@ static void cull_queue(void) {
   //printf("[cull_queue]queued_paths %d\n",queued_paths);
   //printf("[cull_queue]top_directed_len %d\n",top_directed_len);
 
-  // when path is not enough, do not try directed.
-  assert(dp <= 1);
-  if (queued_paths < 3) 
-    queued_directed = 0;
-  else{
-    tmp = queued_paths * dp;
-    if(tmp <= 1 && tmp > 0)
-      queued_directed = 1;
-    else
-      queued_directed = (u32)tmp;
-  }
-
-  //printf("[cull_queue]queued_directed %d\n",queued_directed);
-  struct queue_entry *p;
-  p = top_directed;
-
-  if (queued_directed > top_directed_len){
-    while(p){ //**select all directed testcases
-      p->directed = 1;
-      if(!p->was_fuzzed)
-        pending_directed++;
-      p = p->next_directed;
+  if (top_directed_len != 0 && dp != 0)
+  {
+    // when path is not enough, do not try directed.
+    assert(dp <= 1);
+    if (queued_paths < 3) 
+      queued_directed = 0;
+    else{
+      tmp = queued_paths * dp;
+      if(tmp <= 1 && tmp > 0)
+        queued_directed = 1;
+      else
+        queued_directed = (u32)tmp;
     }
-    queued_directed = top_directed_len;
-  }
-  else{
-    u32 i = queued_directed;
-    while(i > 0 && p){
-      p->directed = 1;
-      if(!p->was_fuzzed)
-        pending_directed++;
-      p = p->next_directed;
-      i--;
+
+    //printf("[cull_queue]queued_directed %d\n",queued_directed);
+    struct queue_entry *p;
+    p = top_directed;
+
+    if (queued_directed > top_directed_len){
+      while(p){ //**select all directed testcases
+        p->directed = 1;
+        if(!p->was_fuzzed)
+          pending_directed++;
+        p = p->next_directed;
+      }
+      queued_directed = top_directed_len;
+    }
+    else{
+      u32 i = queued_directed;
+      while(i > 0 && p){
+        p->directed = 1;
+        if(!p->was_fuzzed)
+          pending_directed++;
+        p = p->next_directed;
+        i--;
+      }
     }
   }
   //*****************************************************
@@ -2538,10 +2553,9 @@ static u8 run_target(char** argv, u32 timeout) {
       if (waitpid(child_pid, &status, 0) <= 0) PFATAL("waitpid() failed");
       //memset(trace_bits, 0, MAP_SIZE);
       stop_pt_fuzzer(trace_bits);
-      p_score = get_p_score();
+      
       //u32 cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
       //printf("[run_target] p_score:%f, trace_bits_hash: %x\n", p_score, cksum);
-
       close(aa_pipe_fd[0]);
       close(aa_pipe_fd[1]);
       //printf("这是父进程,进程标识符是%d\n",getpid());
@@ -7978,14 +7992,14 @@ static void save_cmdline(u32 argc, char** argv) {
 
 bool read_min_max()
 {
-	FILE *fp;
-	int MAX_LINE_T = 1024;
+  FILE *fp;
+  int MAX_LINE_T = 1024;
     char strLine[MAX_LINE_T];
     char* endptr;
     
     min_addr_cle = 0ULL;
-	max_addr_cle = 0ULL;
-	entry_point_cle = 0ULL;
+  max_addr_cle = 0ULL;
+  entry_point_cle = 0ULL;
     
     if((fp = fopen("./min_max.txt","r")) == NULL) 
     {   
@@ -7999,19 +8013,19 @@ bool read_min_max()
     entry_point_cle = strtoull(strLine, &endptr, 10);
     fclose(fp);
     
-	if(min_addr_cle == 0ULL || max_addr_cle == 0ULL || entry_point_cle == 0ULL)
-	{
-		printf("Error: min max addr = 0\n");
-		return false;
-	}
-	return true;
+  if(min_addr_cle == 0ULL || max_addr_cle == 0ULL || entry_point_cle == 0ULL)
+  {
+    printf("Error: min max addr = 0\n");
+    return false;
+  }
+  return true;
 }
 
 bool read_raw_bin()
 {
-	FILE* pt_file = fopen("./raw_bin", "rb");
-	
-	raw_bin_buf = malloc(max_addr_cle - min_addr_cle);
+  FILE* pt_file = fopen("./raw_bin", "rb");
+  
+  raw_bin_buf = malloc(max_addr_cle - min_addr_cle);
     memset(raw_bin_buf, 0, max_addr_cle - min_addr_cle);
     
     if(NULL == pt_file)
@@ -8025,13 +8039,13 @@ bool read_raw_bin()
         count = fread (raw_bin_buf, sizeof(uint8_t), max_addr_cle - min_addr_cle, pt_file);
     }
     fclose(pt_file);
-	return true;
+  return true;
 }
 
 void last_free_memory()
 {
-	free(raw_bin_buf);
-	//pt_decoder_destroy(run.decoder);
+  free(raw_bin_buf);
+  //pt_decoder_destroy(run.decoder);
 }
 
 void schedule_seeds(struct queue_entry *queue_cur){

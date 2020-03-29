@@ -212,16 +212,25 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
 
     //cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;
+    this->cofi_map.clear_mini_trace(); // clear mini trace of last time
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
     decoder.decode(); // main phase to decode pt packets
 
-#ifdef DEBUG
     //this->cofi_map.print_edge_map(1); // 0 valid, 1 count 2 p
     //this->cofi_map.print_edge_map(2); // 0 valid, 1 count 2 p
-#endif
+    /*
+    FILE* f1;
+    f1 = fopen("pscore_trace.txt", "a+");
+
+  	fprintf(f1, "[stop_pt_trace] clear mini trace\n");
+
+  	fclose(f1);*/
+	
+    
 
     this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
+
     this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
 
 
@@ -237,6 +246,7 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
     num_runs ++;
 
 
+
     FILE* f = fopen("../control_inst_flow.txt", "w");
     if(f != nullptr) {
         //cout << "[pt_fuzzer::stop_pt_trace]start to write control flow to file." << endl;
@@ -247,7 +257,11 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
         cerr << "[pt_fuzzer::stop_pt_trace]open file control_inst_flow.txt failed." << endl;
     }
 
+
 }
+
+		
+
 
 /*
 pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode) {
@@ -312,14 +326,17 @@ extern "C" {
 	    the_fuzzer->cofi_map.update_probability();
 	}
 	float get_p_score(){
+		the_fuzzer->cofi_map.dump_control_flow();
 		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->target_addr);
 		float p;
-		if (ret == 0 || ret == 1) // 0 cannot find a conversion path 
+		if (ret == 0 || ret == 1){// 0 cannot find a conversion path 
+			//the_fuzzer->cofi_map.clear_mini_trace();
 			return (float)ret;           // trace goes through the target 
+		}
 		else{
 			// return the largest p score when there are more than one conversion path
 		    p = the_fuzzer->cofi_map.score_back_path(); 
-			the_fuzzer->cofi_map.clear_mini_trace();
+			//the_fuzzer->cofi_map.clear_mini_trace();
 			return p;
 		}
 

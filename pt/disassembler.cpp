@@ -279,19 +279,23 @@ my_cofi_map::~my_cofi_map() {
 
 
 void my_cofi_map::my_cofi_map::print_map_data(void){
+    FILE* f;
+    f = fopen("pscore_trace.txt", "a+");
+
     cout<<"code_size: "<<code_size<<" base_address: "<<hex<<base_address<<endl;
     for (uint64_t i = 0; i<code_size; i++){
         if (map_data[i]!= nullptr){
             if(map_data[i]->next_cofi!=nullptr)
-                printf("[%d]%x, bb_start_addr: %x inst_addr: %x target_addr: %x str:%s, next: %x, type: %x\n", 
+                fprintf(f,"[%d]%x, bb_start_addr: %x inst_addr: %x target_addr: %x str:%s, next: %x, type: %x\n", 
                 i, base_address+i, map_data[i]->bb_start_addr, map_data[i]->inst_addr, 
                 map_data[i]->target_addr, map_data[i]->dis_inst.c_str(), map_data[i]->next_cofi->bb_start_addr, map_data[i]->type);
             else
-                printf("[%d]%x, bb_start_addr: %x inst_addr: %x target_addr: %x str:%s, next: null, type: %x\n", 
+                fprintf(f,"[%d]%x, bb_start_addr: %x inst_addr: %x target_addr: %x str:%s, next: null, type: %x\n", 
                 i, base_address+i, map_data[i]->bb_start_addr, map_data[i]->inst_addr, 
                 map_data[i]->target_addr, map_data[i]->dis_inst.c_str(), map_data[i]->type);
         }
     }
+    fclose(f);
 }
 
 void my_cofi_map::construct_bb_list(void){
@@ -596,29 +600,29 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     uint64_t prev_cur, cur, ret = 0;
     vector<uint64_t> path;
 
-    #ifdef DEBUG 
-    printf("[target_backward_search]mini_trace\n");
-    for (uint64_t i = 0; i < bbnum; i++){
-        printf("%d", mini_trace[i] );
-    }
-    printf("\n");
-    #endif
+    FILE* f;
 
-    #ifdef DEBUG 
-    cout<<"[target_backward_search]target_addr: "<<target_addr<<endl; 
-    #endif
+    f = fopen("pscore_trace.txt", "a+");
+    
+    fprintf(f,"[target_backward_search]mini_trace\n");
+    for (uint64_t i = 0; i < bbnum; i++){
+        fprintf(f,"%d", mini_trace[i] );
+    }
+    fprintf(f,"\n");
+    
+
+    fprintf(f,"[target_backward_search]target_addr: %x\n", target_addr); 
+
     uint64_t target_cofi = map_data[target_addr-base_address]->inst_addr;
-    #ifdef DEBUG
-    cout<<"[target_backward_search]target_cofi: "<<target_cofi<<endl;
-    #endif
+    
+    fprintf(f,"[target_backward_search]target_cofi: %x\n",target_cofi);
+    
     uint64_t t = addr_to_idx[target_cofi];
-    #ifdef DEBUG
-    printf("[target_backward_search]t: %d\n", t);
-    #endif
+    
+    fprintf(f, "[target_backward_search]t: %d\n", t);
+    
     if (mini_trace[t] == 1) {//trace pass through target.
-    #ifdef DEBUG
-        printf("[target_backward_search]trace pass through target, return 1\n");
-    #endif
+        fprintf(f, "[target_backward_search]trace pass through target, return 1\n");
 
         return 1;
     }
@@ -626,75 +630,71 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
 
     cur = t;
     while(true){
-        #ifdef DEBUG
-        printf("[target_backward_search] cur = %d, pos[%d] = %d\n", cur, cur, pos[cur]);
-        #endif
+        
+        fprintf(f, "[target_backward_search] cur = %d, pos[%d] = %d\n", cur, cur, pos[cur]);
+        
         if(mini_map_x[cur].size() == 0 && path.size() == 0){
             ret = 0;
-            #ifdef DEBUG
-            printf("[target_backward_search] stop at first step\n");
-            #endif
+            
+            fprintf(f,"[target_backward_search] stop at first step\n");
+            
             break; //stop at first step
         }
         else if (mini_trace[cur] == 1){
             vector<uint64_t> cur_path;
             for(uint64_t n = 0; n < path.size(); n++){
-                #ifdef DEBUG
-                printf("%d->", path[n]);
-                #endif
+                fprintf(f, "%d->", path[n]);
                 cur_path.push_back(path[n]);
             }
             cur_path.push_back(cur);
             search_result.push_back(cur_path);
             ret++; // return the num of path found
-            #ifdef DEBUG
-            printf("%d\n",cur);
-            #endif
+            fprintf(f, "%d\n",cur);
+
 
             pos[cur] = 0; // erease
             cur = path.back();//step back
             path.pop_back();
-            #ifdef DEBUG
-            printf("[target_backward_search] move back1, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
-            #endif
+
+            fprintf(f, "[target_backward_search] move back1, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
+
         }
         else if (mini_map_x[cur].size() > 0 && pos[cur] < mini_map_x[cur].size()){
             path.push_back(cur); // move forward 
             prev_cur = cur;     
             cur = mini_map_x[cur][pos[cur]];
             pos[prev_cur]++;  
-            #ifdef DEBUG
-            printf("[target_backward_search] move forward, push %d, cur = %d, pos[%d] = %d, pos[%d] = %d\n", 
+
+            fprintf(f, "[target_backward_search] move forward, push %d, cur = %d, pos[%d] = %d, pos[%d] = %d\n", 
                 prev_cur, cur, cur, pos[cur], prev_cur, pos[prev_cur]);
-            #endif
+
         
         }
         else if (mini_map_x[cur].size() > 0 && pos[cur] == mini_map_x[cur].size()){
             pos[cur] = 0; // erease
             cur = path.back();//step back
             path.pop_back();
-            #ifdef DEBUG
-            printf("[target_backward_search] move back2, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
-            #endif
+
+            fprintf(f, "[target_backward_search] move back2, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
+
         }
         else if (mini_map_x[cur].size() == 0 && path.size()>0){
             pos[cur] = 0; // erease
             cur = path.back();//step back
             path.pop_back();
-            #ifdef DEBUG
-            printf("[target_backward_search] move back3, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
-            #endif
+
+            fprintf(f, "[target_backward_search] move back3, pop %d, cur = %d, pos[%d] = %d\n", cur, cur, cur, pos[cur]);
+
         }
         if (path.size()==0 && pos[cur] == mini_map_x[cur].size()){
-            #ifdef DEBUG
-            printf("[target_backward_search] finish\n");
-            #endif
+            fprintf(f, "[target_backward_search] finish\n");
+
             break; //finish
         }
     }
-    #ifdef DEBUG
-    printf("[target_backward_search] ret = %d\n", ret);
-    #endif
+
+    fprintf(f, "[target_backward_search] ret = %d\n", ret);
+    fclose(f);
     return ret;
 
 }
@@ -739,17 +739,20 @@ void my_cofi_map::update_probability(void){
 }
 double my_cofi_map::score_back_path(void){
 
-#ifdef DEBUG
-    printf("[score_back_path] search_result:\n");
+    FILE* f;
+
+    f = fopen("pscore_trace.txt", "a+");
+
+    fprintf(f, "[score_back_path] search_result:\n");
     for (uint64_t i = 0; i < search_result.size(); i++){
         for (uint64_t j = 0; j < search_result[i].size(); j++){
-            printf("%x->", idx_to_addr[search_result[i][j]] );
+            fprintf(f, "%x->", idx_to_addr[search_result[i][j]] );
         }
 
-        printf("\n");
+        fprintf(f,"\n");
     }
   
-#endif
+
 
     uint64_t x, y;
     double pp, max;
@@ -761,15 +764,18 @@ double my_cofi_map::score_back_path(void){
             y = search_result[i][j+1];
             pp = pp*edge_map[x][y].p;
             #ifdef DEBUG
-            printf("%d->%d: %f\n", x, y, pp );
+            fprintf(f, "%d->%d: %f\n", x, y, pp );
             #endif
         }
         if (pp > max)
             max = pp;
-        #ifdef DEBUG
-        printf("[score_back_path]----max prabability is: %f\n",max);
-        #endif
+
+        fprintf(f, "[score_back_path]----max prabability is: %f\n",max);
+
     }
+
+    fclose(f);
+
     return max;
 }
 

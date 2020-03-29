@@ -3,6 +3,8 @@
 sudo rm -rf test/output/ 
 mkdir test/output/
 
+rm -f build/pscore_trace.txt
+
 sudo rm -r build
 mkdir build
 cd build
@@ -11,10 +13,10 @@ cmake ../ -DPREFIX=. -DBUILD_TYPE="Release"
 make
 make install 
 
-python ./bin/ptfuzzer.py  "-i ../test/input/ -o ../test/output -X ../test/targets.txt" "../test/a.out"
+#python ./bin/ptfuzzer.py  "-i ../test/input/ -o ../test/output -X ../test/targets.txt" "../test/a.out"
 
 #python ./bin/ptfuzzer.py  "-i ../test/input/ -o ../test/output" "../test/a.out"
 
-#python ./bin/run_with_pt.py ../test/a.out file
+python ./bin/run_with_pt.py ../test/a.out file
 
 #python ./bin/run_with_pt.py ../ocean-non_contiguous_partitions/OCEAN

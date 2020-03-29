@@ -144,6 +144,7 @@ class my_cofi_map : public i_cofi_map {
     vector<uint64_t>  * mini_map_y;
     vector<vector<uint64_t>> search_result;
     uint8_t * mini_trace;
+    vector<uint64_t> control_flow;
 public:
     my_cofi_map(uint64_t base_address, uint32_t code_size);
     ~my_cofi_map();
@@ -170,10 +171,24 @@ public:
    
     inline void mark_mini_trace(vector<uint64_t> cf){
         //mark trace
+        this->control_flow = cf;
         for(uint64_t i = 0; i < cf.size(); i++){
             uint64_t x = addr_to_idx[cf[i]];
             this->mini_trace[x] = 1;
         }   
+    }
+    inline void dump_control_flow(){
+        FILE* f;
+        f = fopen("pscore_trace.txt", "a+");
+        for(int i = 0; i < this->control_flow.size(); i ++) {
+            fprintf(f, "%p\n", control_flow[i]);
+        }
+        fclose(f);
+    }
+    inline void mark_single_mini_trace(uint64_t addr){
+        uint64_t x = addr_to_idx[addr];
+        this->mini_trace[x] = 1;
+        
     }
     inline void clear_mini_trace(){
         
