@@ -4,6 +4,9 @@
 #define _HF_LINUX_PERF_H_
 #define _GNU_SOURCE
 
+
+
+
 //~ #include <dirent.h>
 #include <inttypes.h>
 #include <limits.h>
@@ -39,7 +42,8 @@
 #include <vector>
 #include "disassembler.h"
 #include "pt_ext.h"
-#include <linux/timer.h>
+//#include <linux/timer.h>
+//#include <linux/hrtimer.h>
 //~ #include "tnt_cache.h"
 
 /* Size (in bytes) for report data to be stored in stack before written to file */
@@ -478,6 +482,9 @@ public:
     uint64_t max_address;
     uint64_t entry_point;
     uint64_t target_addr;
+    
+    uint64_t targets[10];
+    uint64_t target_num;
 
     int32_t perfIntelPtPerfType = -1;
     uint8_t save_cf = 0;
@@ -489,10 +496,10 @@ public:
     uint64_t num_runs = 0;
 
 public:
-    pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr);
+    pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t* target_buf, uint64_t num);
     void init();
     void start_pt_trace(int pid);
-    void stop_pt_trace(uint8_t *trace_bits);
+    void stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging);
     uint64_t get_target(void){return target_addr;}
     pt_packet_decoder* debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode=TNT_MODE);
     chrono::time_point<chrono::steady_clock> start;

@@ -698,6 +698,82 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     return ret;
 
 }
+
+
+
+double my_cofi_map::score_back_path(void){
+
+    FILE* f;
+
+    f = fopen("pscore_trace.txt", "a+");
+
+    fprintf(f, "[score_back_path] search_result:\n");
+    for (uint64_t i = 0; i < search_result.size(); i++){
+        for (uint64_t j = 0; j < search_result[i].size(); j++){
+            fprintf(f, "%x->", idx_to_addr[search_result[i][j]] );
+        }
+
+        fprintf(f,"\n");
+    }
+  
+    if (search_result.size() == 0)
+        return 0;
+
+
+    uint64_t x, y;
+    double pp, max;
+    max = 0;
+    for (uint64_t i = 0; i < search_result.size(); i++){
+        pp = 1;
+        for (uint64_t j = 0; j + 1 < search_result[i].size(); j++){
+            x = search_result[i][j];
+            y = search_result[i][j+1];
+            pp = pp*edge_map[x][y].p;
+            #ifdef DEBUG
+            fprintf(f, "%d->%d: %f\n", x, y, pp );
+            #endif
+        }
+        if (pp > max)
+            max = pp;
+
+        fprintf(f, "[score_back_path]----max prabability is: %f\n",max);
+
+    }
+
+    fclose(f);
+
+    return max;
+}
+double my_cofi_map::evaluate_seed(uint64_t* targets, uint64_t target_num){
+    uint64_t path_num = 0;
+    double max_p, cur_p = 0;
+
+    for(uint8_t i = 0; i < target_num; i++){
+        if(targets[i] < this->min_address || targets[i] > this->max_address)
+            continue;
+        else{
+            /*paths stored in search_result, return path num*/
+            path_num = target_backward_search(targets[i]);
+            if (path_num == 0)
+                continue;
+            else{
+                cur_p = score_back_path();
+                if (cur_p > max_p)
+                    max_p = cur_p;
+                search_result.clear();
+            }
+
+        }
+    }
+    return max_p;
+
+}
+
+
+
+
+
+
 //update the probability in the edge_map every 30 runs.
 void my_cofi_map::update_probability(void){
     uint64_t x, y, sum = 0;
@@ -736,46 +812,5 @@ void my_cofi_map::update_probability(void){
         }
 
     }
-}
-double my_cofi_map::score_back_path(void){
-
-    FILE* f;
-
-    f = fopen("pscore_trace.txt", "a+");
-
-    fprintf(f, "[score_back_path] search_result:\n");
-    for (uint64_t i = 0; i < search_result.size(); i++){
-        for (uint64_t j = 0; j < search_result[i].size(); j++){
-            fprintf(f, "%x->", idx_to_addr[search_result[i][j]] );
-        }
-
-        fprintf(f,"\n");
-    }
-  
-
-
-    uint64_t x, y;
-    double pp, max;
-    max = 0;
-    for (uint64_t i = 0; i < search_result.size(); i++){
-        pp = 1;
-        for (uint64_t j = 0; j + 1 < search_result[i].size(); j++){
-            x = search_result[i][j];
-            y = search_result[i][j+1];
-            pp = pp*edge_map[x][y].p;
-            #ifdef DEBUG
-            fprintf(f, "%d->%d: %f\n", x, y, pp );
-            #endif
-        }
-        if (pp > max)
-            max = pp;
-
-        fprintf(f, "[score_back_path]----max prabability is: %f\n",max);
-
-    }
-
-    fclose(f);
-
-    return max;
 }
 

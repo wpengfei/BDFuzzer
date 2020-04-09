@@ -37,12 +37,17 @@ static ssize_t files_readFileToBufMax(char* fileName, uint8_t* buf, size_t fileM
 }
 
 
-pt_fuzzer::pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t target_addr) :
+pt_fuzzer::pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t* target_buf, uint64_t num) :
 	        raw_binary_file(raw_binary_file), base_address(base_address), max_address(max_address), entry_point(entry_point),
-	        target_addr(target_addr), code(nullptr) , trace(nullptr), cofi_map(base_address, max_address-base_address) {
+	         target_num(num), code(nullptr) , trace(nullptr), cofi_map(base_address, max_address-base_address) {
+
+	for (uint8_t i = 0; i < num; i++)
+		targets[i] = target_buf[i];
+
+
 #ifdef DEBUG
     cout << "init pt fuzzer: raw_binary_file = " << raw_binary_file << ", min_address = " << base_address
-            << ", max_address = " << max_address << ", entry_point = " << entry_point <<", target_addr = "<<target_addr<< endl;
+            << ", max_address = " << max_address << ", entry_point = " << entry_point <<", target_num = "<<num<< endl;
 #endif
 
 }
@@ -198,7 +203,7 @@ void pt_fuzzer::start_pt_trace(int pid) {
 }
 
 
-void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
+void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
  
     if(!this->trace->stop_trace()){
         cerr << "[pt_fuzzer::stop_pt_trace]stop PT event failed." << endl;
@@ -211,7 +216,8 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
 
 
-    //cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;
+    
+    //cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;i
     this->cofi_map.clear_mini_trace(); // clear mini trace of last time
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
@@ -228,11 +234,13 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
   	fclose(f1);*/
 	
     
+    if(!skip_logging){
 
-    this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
+	    this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
 
-    this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
+	    this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
 
+	}
 
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << endl;
@@ -249,7 +257,6 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits) {
 
     FILE* f = fopen("../control_inst_flow.txt", "w");
     if(f != nullptr) {
-        //cout << "[pt_fuzzer::stop_pt_trace]start to write control flow to file." << endl;
         decoder.dump_control_flows(f);
         fclose(f);
     }
@@ -289,33 +296,32 @@ pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_in
 
 
 
-
 extern "C" {
 	pt_fuzzer* the_fuzzer;
-	void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point, uint64_t target_addr){
+	void init_pt_fuzzer(char* raw_bin_file, uint64_t min_addr, uint64_t max_addr, uint64_t entry_point, uint64_t* target_buf, uint64_t num){
 	    if(raw_bin_file == nullptr) {
 	        cerr << "raw binary file not set." << endl;
 	        exit(-1);
 	    }
-	    if(min_addr == 0 || max_addr == 0 || entry_point == 0 || target_addr == 0) {
-	        cerr << "min_addr, max_addr, entry_point or target_addr not set." << endl;
+	    if(min_addr == 0 || max_addr == 0 || entry_point == 0) {
+	        cerr << "min_addr, max_addr, entry_point not set." << endl;
 	        exit(-1);
 	    }
-	    the_fuzzer = new pt_fuzzer(raw_bin_file, min_addr, max_addr, entry_point, target_addr);
+	    the_fuzzer = new pt_fuzzer(raw_bin_file, min_addr, max_addr, entry_point, target_buf, num);
 	    the_fuzzer->init();
 	}
 	void start_pt_fuzzer(int pid){
 	    the_fuzzer->start_pt_trace(pid);
 	    the_fuzzer->start = chrono::steady_clock::now();
 	}
-	void stop_pt_fuzzer(uint8_t *trace_bits){
+	void stop_pt_fuzzer(uint8_t *trace_bits, uint8_t skip_logging){
 	    the_fuzzer->end = chrono::steady_clock::now();
 	    the_fuzzer->diff = the_fuzzer->end - the_fuzzer->start;
 	#ifdef DEBUG
 	    cout << "Time of exec: " << the_fuzzer->diff.count()*1000000000 << endl;
 	#endif
 	    the_fuzzer->start = chrono::steady_clock::now();
-	    the_fuzzer->stop_pt_trace(trace_bits);
+	    the_fuzzer->stop_pt_trace(trace_bits, skip_logging);
 	    the_fuzzer->end = chrono::steady_clock::now();
 	    the_fuzzer->diff = the_fuzzer->end - the_fuzzer->start;
 	#ifdef DEBUG
@@ -327,7 +333,9 @@ extern "C" {
 	}
 	float get_p_score(){
 		the_fuzzer->cofi_map.dump_control_flow();
-		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->target_addr);
+		float p_score = the_fuzzer->cofi_map.evaluate_seed(the_fuzzer->targets, the_fuzzer->target_num);
+		/*
+		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->targets, the_fuzzer->target_num);
 		float p;
 		if (ret == 0 || ret == 1){// 0 cannot find a conversion path 
 			//the_fuzzer->cofi_map.clear_mini_trace();
@@ -339,6 +347,7 @@ extern "C" {
 			//the_fuzzer->cofi_map.clear_mini_trace();
 			return p;
 		}
+		*/
 
 	}
 

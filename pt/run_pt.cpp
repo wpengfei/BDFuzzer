@@ -23,7 +23,7 @@ void* decoder_thread(void* p)
     sleep(1);           
     std::cout << "pt opened! and execution finished! start to decode  "<<i <<std::endl;
     pt_fuzzer* s = (pt_fuzzer*)p;
-    s->stop_pt_trace(a);
+    s->stop_pt_trace(a, 0);
 
 }
 int main(int argc, char** argv)
@@ -53,7 +53,10 @@ int main(int argc, char** argv)
     args[i] = nullptr;
     std::cout << std::endl;
 
-    pt_fuzzer fuzzer(raw_bin, min_addr, max_addr, entry_point, target_addr);
+    uint64_t target_buf[10];
+    uint8_t num;
+
+    pt_fuzzer fuzzer(raw_bin, min_addr, max_addr, entry_point, target_buf, num);
     fuzzer.init();
 
     pid_t pid;        //进程标识符
@@ -65,6 +68,7 @@ int main(int argc, char** argv)
     else if(pid == 0)   {//如果pid为0则表示当前执行的是子进程
         std::cout << "[run_pt::main]child process start, pid is " << getpid() << "." << std::endl;
         sleep(1);
+        
         int ret = execv(app_name, args);
         if(ret == -1){
             std::cerr << "execv failed." << std::endl;

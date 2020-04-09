@@ -3,6 +3,8 @@ project(ptfuzzer)
 
 
 add_compile_options("-Wall")
+add_compile_options("-I /usr/src/linux-headers-4.15.0-91/include/")
+
 IF (BUILD_TYPE MATCHES "Debug")
     message( "build type is Debug." )
     set ( CMAKE_C_FLAGS "-std=c11 -O0 -D_FILE_OFFSET_BITS=64 -g -DDEBUG ")

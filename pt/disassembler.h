@@ -238,9 +238,11 @@ public:
     void print_bb_list(void);
     void construct_edge_map(void);
     void print_edge_map(uint8_t arg);
-    uint64_t target_backward_search(uint64_t target);
+
+    uint64_t target_backward_search(uint64_t target_addr);
     uint64_t target_backward_search_test(uint64_t target_addr);
     double score_back_path(void);
+    double evaluate_seed(uint64_t* targets, uint64_t target_num);
     void update_probability(void);
 
 };

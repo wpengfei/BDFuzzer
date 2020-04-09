@@ -2426,7 +2426,11 @@ EXP_ST void init_forkserver(char** argv) {
 /* Execute target application, monitoring for timeouts. Return status
    information. The called program will update trace_bits[]. */
 
-static u8 run_target(char** argv, u32 timeout) {
+//** skip_logging: stop record the statistics when 
+//** running the same input for multiple times,
+//** specially designed for calibrate_case()
+
+static u8 run_target(char** argv, u32 timeout, u8 skip_logging) {
 
   static struct itimerval it;
   static u32 prev_timed_out = 0;
@@ -2552,7 +2556,7 @@ static u8 run_target(char** argv, u32 timeout) {
       write(aa_pipe_fd[1],"s",strlen("s"));
       if (waitpid(child_pid, &status, 0) <= 0) PFATAL("waitpid() failed");
       //memset(trace_bits, 0, MAP_SIZE);
-      stop_pt_fuzzer(trace_bits);
+      stop_pt_fuzzer(trace_bits, skip_logging);
       
       //u32 cksum = hash32(trace_bits, MAP_SIZE, HASH_CONST);
       //printf("[run_target] p_score:%f, trace_bits_hash: %x\n", p_score, cksum);
@@ -2815,7 +2819,7 @@ static u8 calibrate_case(char** argv, struct queue_entry* q, u8* use_mem,
 
     write_to_testcase(use_mem, q->len);
 
-    fault = run_target(argv, use_tmout);
+    fault = run_target(argv, use_tmout, 1); //skip_logging
 
     /* stop_soon is set by the handler for Ctrl+C. When it's pressed,
        we want to bail out quickly. */
@@ -3445,7 +3449,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
 
         u8 new_fault;
         write_to_testcase(mem, len);
-        new_fault = run_target(argv, hang_tmout);
+        new_fault = run_target(argv, hang_tmout, 1);
 
         /* A corner case that one user reported bumping into: increasing the
            timeout actually uncovers a crash. Make sure we don't discard it if
@@ -4770,7 +4774,7 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
       write_with_gap(in_buf, q->len, remove_pos, trim_avail);
 
-      fault = run_target(argv, exec_tmout);
+      fault = run_target(argv, exec_tmout, 1);
       trim_execs++;
 
       if (stop_soon || fault == FAULT_ERROR) goto abort_trimming;
@@ -4863,7 +4867,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
 
   write_to_testcase(out_buf, len);
 
-  fault = run_target(argv, exec_tmout);
+  fault = run_target(argv, exec_tmout, 0);
 
   if (stop_soon) return 1;
 
@@ -7018,7 +7022,7 @@ static void sync_fuzzers(char** argv) {
 
         write_to_testcase(mem, st.st_size);
 
-        fault = run_target(argv, exec_tmout);
+        fault = run_target(argv, exec_tmout, 0);
 
         if (stop_soon) return;
 
@@ -8412,25 +8416,27 @@ int main(int argc, char** argv) {
   //initial perf
   printf("init pt fuzzer.\n");
 
-  uint64_t targets[10], i = 0;  // at most 10 targets
+  uint64_t targets_buf[10], i = 0;  // at most 10 targets
   FILE *fp;            
-  uint8_t len = 0;
+  uint8_t num = 0;
   if((fp = fopen(targets_dir,"r")) == NULL)
   {
     printf("open target file error!\n");
     exit (0) ;
   }
-  while(i<10){
-    fscanf(fp,"%x\n", &targets[i]);
-    printf("target[%d]%x\n", i, targets[i]);
-    if (targets[i] == 0 )
+  while(i < 10){
+    fscanf(fp,"%x\n", &targets_buf[i]);
+    printf("target[%d]%x\n", i, targets_buf[i]);
+    if (targets_buf[i] == 0 )
       break;
     i++;
   }
-  len = i;
+  num = i;
+  printf("num = %d\n", num);
   
-  cur_target_addr = targets[0];
-  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, targets[0]);
+  cur_target_addr = targets_buf[0];
+
+  init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, targets_buf, num);
 
 
 #ifdef DEBUG
