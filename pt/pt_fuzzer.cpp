@@ -223,6 +223,22 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
     decoder.decode(); // main phase to decode pt packets
 
+    uint64_t from, to, type=0;
+	for (uint64_t i = 0; i < decoder.execution_path.size(); i++){
+		from = decoder.execution_path[i].from;
+		to = decoder.execution_path[i].to;
+		type = decoder.execution_path[i].type;
+		decoder.update_tracebits(from, to);
+		if(!skip_logging){
+			this->cofi_map.mark_mini_trace_by_node(from);
+			this->cofi_map.mark_mini_trace_by_node(to);
+			this->cofi_map.update_edge_count(from, to); // do not clear
+			if(type == 0) //indirect call
+				this->cofi_map.add_edge(from, to);
+            
+		}
+	}
+
     //this->cofi_map.print_edge_map(1); // 0 valid, 1 count 2 p
     //this->cofi_map.print_edge_map(2); // 0 valid, 1 count 2 p
     /*
@@ -233,14 +249,14 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
 
   	fclose(f1);*/
 	
-    
+    /*
     if(!skip_logging){
 
 	    this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
 
 	    this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
 
-	}
+	}*/
 
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << endl;
@@ -255,9 +271,9 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
 
 
 
-    FILE* f = fopen("../control_inst_flow.txt", "w");
+    FILE* f = fopen("../execution_path.txt", "w");
     if(f != nullptr) {
-        decoder.dump_control_flows(f);
+        decoder.dump_execution_path(f);
         fclose(f);
     }
     else {
@@ -332,8 +348,10 @@ extern "C" {
 	    the_fuzzer->cofi_map.update_probability();
 	}
 	float get_p_score(){
-		the_fuzzer->cofi_map.dump_control_flow();
+		//the_fuzzer->cofi_map.dump_control_flow();
 		float p_score = the_fuzzer->cofi_map.evaluate_seed(the_fuzzer->targets, the_fuzzer->target_num);
+		the_fuzzer->cofi_map.clear_mini_trace();
+		return p_score;
 		/*
 		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->targets, the_fuzzer->target_num);
 		float p;

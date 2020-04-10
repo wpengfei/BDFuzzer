@@ -594,10 +594,11 @@ uint64_t my_cofi_map::target_backward_search_test(uint64_t target_addr){
 }
 
 
-
-uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
+//return the number of convertion paths, -1 indicates going through the target
+int my_cofi_map::target_backward_search(uint64_t target_addr){
     uint64_t pos[bbnum]={0}; //current postion in a certain column of the mini_map
-    uint64_t prev_cur, cur, ret = 0;
+    uint64_t prev_cur, cur = 0;
+    int ret = 0; 
     vector<uint64_t> path;
 
     FILE* f;
@@ -622,9 +623,9 @@ uint64_t my_cofi_map::target_backward_search(uint64_t target_addr){
     fprintf(f, "[target_backward_search]t: %d\n", t);
     
     if (mini_trace[t] == 1) {//trace pass through target.
-        fprintf(f, "[target_backward_search]trace pass through target, return 1\n");
+        fprintf(f, "[target_backward_search]trace pass through target, return -1\n");
 
-        return 1;
+        return -1;
     }
     
 
@@ -740,12 +741,14 @@ double my_cofi_map::score_back_path(void){
 
     }
 
+    search_result.clear();
+
     fclose(f);
 
     return max;
 }
 double my_cofi_map::evaluate_seed(uint64_t* targets, uint64_t target_num){
-    uint64_t path_num = 0;
+    int path_num = 0;
     double max_p, cur_p = 0;
 
     for(uint8_t i = 0; i < target_num; i++){
@@ -756,17 +759,18 @@ double my_cofi_map::evaluate_seed(uint64_t* targets, uint64_t target_num){
             path_num = target_backward_search(targets[i]);
             if (path_num == 0)
                 continue;
+            else if (path_num == -1)
+                return 1;
             else{
                 cur_p = score_back_path();
                 if (cur_p > max_p)
                     max_p = cur_p;
-                search_result.clear();
+                
             }
 
         }
     }
     return max_p;
-
 }
 
 

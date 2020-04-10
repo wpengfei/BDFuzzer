@@ -235,7 +235,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                         cout <<BOLDYELLOW<< "Target:"<<cofi_obj->target_addr<<"Out of bounds, change to 0!" << hex <<RESET<< endl;
 #endif
-                        last_target0 = cofi_obj->inst_addr;
+                        this->last_jumpsite = cofi_obj->inst_addr;// jumpsite of indirect call or before going out of bound
                         cofi_obj->target_addr = 0;
 
                         cofi_obj = nullptr;
@@ -244,13 +244,21 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                         assert(cofi_obj->target_addr != 0);
 
                         uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
+
+                        block_trans_t bt;
+                        bt.from = cofi_obj->inst_addr;
+                        bt.to = target_cofi;
+                        bt.type = 1; // conditional
+                        execution_path.push_back(bt);
+
+                        /*
                         cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);
                         update_tracebits(cofi_obj->inst_addr, target_cofi);
                         
                         if (control_flows.size()==0)
                             control_flows.push_back(cofi_obj->inst_addr);
                         control_flows.push_back(target_cofi);
-                        
+                        */
 
                         
                         
@@ -266,13 +274,21 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     cout << BOLDMAGENTA<< "COFI_TYPE_CONDITIONAL_BRANCH: " << hex <<cofi_obj->inst_addr << " NOT_TAKEN, next = " << cofi_obj->next_cofi->inst_addr <<RESET<< endl;
 #endif            
                     uint64_t next_cofi = cofi_obj->next_cofi->inst_addr;
+
+                    block_trans_t bt;
+                    bt.from = cofi_obj->inst_addr;
+                    bt.to = next_cofi;
+                    bt.type = 1; // conditional jump
+                    execution_path.push_back(bt);
+
+                    /*
                     cofi_map.add_edge(cofi_obj->inst_addr, next_cofi);
                     update_tracebits(cofi_obj->inst_addr, next_cofi);
 
                     if (control_flows.size()==0)
                         control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(next_cofi);
-                    
+                    */
 
                     //cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<next_bb_addr<< hex <<RESET<< endl;
                     cofi_obj = cofi_obj->next_cofi;
@@ -289,7 +305,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                     cout <<BOLDYELLOW<< "Target: "<<cofi_obj->target_addr<<" Out of bounds, change to 0!" << hex <<RESET<< endl;
 #endif
-                    last_target0 = cofi_obj->inst_addr;// last cofi whose target it is 0
+                    this->last_jumpsite = cofi_obj->inst_addr;// jumpsite of indirect call or before going out of bound
                     cofi_obj->target_addr = 0;
                     cofi_obj = nullptr;
                 }
@@ -297,13 +313,21 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
                     assert(cofi_obj->target_addr != 0);
 
                     uint64_t target_cofi = cofi_map.get_cofi_addr(cofi_obj->target_addr);
+
+                    block_trans_t bt;
+                    bt.from = cofi_obj->inst_addr;
+                    bt.to = target_cofi;
+                    bt.type = 2; // unconditional jump
+                    execution_path.push_back(bt);
+
+                    /*
                     cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);
                     update_tracebits(cofi_obj->inst_addr, target_cofi);
 
                     if (control_flows.size()==0)
                         control_flows.push_back(cofi_obj->inst_addr);
                     control_flows.push_back(target_cofi);
-                    
+                    */
 
                     //cout <<BOLDRED<< "PUSH: "<<cofi_obj->inst_addr<<" "<<cofi_obj->target_addr<< hex <<RESET<< endl;
                     cofi_obj = get_cofi_obj(cofi_obj->target_addr);
@@ -314,7 +338,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                 cout << BOLDMAGENTA<< "COFI_TYPE_INDIRECT_BRANCH: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
-                this->last_target0 = cofi_obj->inst_addr;
+                this->last_jumpsite = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
                 break;
 
@@ -322,7 +346,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                 cout << BOLDMAGENTA<< "COFI_TYPE_NEAR_RET: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif        
-                this->last_target0 = cofi_obj->inst_addr;
+                this->last_jumpsite = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
                 break;
 
@@ -330,7 +354,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
 #ifdef DEBUG
                 cout << BOLDMAGENTA<< "COFI_TYPE_FAR_TRANSFERS: " << hex << cofi_obj->inst_addr << ", target = " << cofi_obj->target_addr <<RESET<< endl;
 #endif
-                this->last_target0 = cofi_obj->inst_addr;
+                this->last_jumpsite = cofi_obj->inst_addr;
                 cofi_obj = nullptr;
                 break;
 
@@ -382,13 +406,13 @@ uint64_t pt_packet_decoder::get_ip_val(unsigned char **pp, unsigned char *end, i
     return v;
 }
 
-void pt_packet_decoder::dump_control_flows(FILE* f) {
+void pt_packet_decoder::dump_execution_path(FILE* f) {
     #ifdef DEBUG
-    cout << "dump control flow inst, total inst is: " << control_flows.size() << endl;
+    cout << "dump execution path, total edges are: " << execution_path.size() << endl;
     #endif
 
-    for(int i = 0; i < this->control_flows.size(); i ++) {
-        fprintf(f, "%p\n", control_flows[i]);
+    for(int i = 0; i < this->execution_path.size(); i ++) {
+        fprintf(f, "%d: %x->%x  %d\n", i, execution_path[i].from, execution_path[i].to, execution_path[i].type);
     }
 }
 

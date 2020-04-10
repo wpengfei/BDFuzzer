@@ -226,6 +226,13 @@ typedef struct _packet_state_t {
 } packet_state_t;
 
 class pt_fuzzer;
+
+typedef struct _block_transitions{
+    uint64_t from;
+    uint64_t to;
+    uint8_t type; // indirect_call:0, direct 0
+}block_trans_t;
+
 class pt_packet_decoder{
     pt_fuzzer* fuzzer;
     uint64_t min_address;
@@ -237,7 +244,8 @@ class pt_packet_decoder{
 
     uint64_t last_tip = 0;
     uint64_t last_ip2 = 0;
-    uint64_t last_target0 = 0; //last inst whose target addr == 0
+    // jumpsite of indirect call or before going out of bound, whose target addr == 0
+    uint64_t last_jumpsite = 0;
     bool start_decode = false;
 
     bool isr = false;
@@ -258,8 +266,8 @@ class pt_packet_decoder{
 
 public:
     uint64_t num_decoded_branch = 0;
+    vector<block_trans_t> execution_path;
     vector<uint64_t> control_flows;
-    
 
 public:
     pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_aux, pt_fuzzer* fuzzer);
@@ -267,6 +275,13 @@ public:
     void set_tracing_flag() { tracing_flag = true; }
     void decode(void);
     uint8_t* get_trace_bits() { return trace_bits; }
+
+    inline void update_tracebits(uint64_t from, uint64_t to){
+        uint16_t pos16 = (uint16_t)cofi_map.get_edge_id(from, to);
+        //cout << "[update_tracebits]get_edge_id: " << pos16 << endl;
+        trace_bits[pos16]++;
+    }
+
 private:
     uint64_t get_ip_val(unsigned char **pp, unsigned char *end, int len, uint64_t *last_ip);
 
@@ -280,7 +295,7 @@ private:
         }
 
 #ifdef DEBUG
-        cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_target0<<" tip: " << hex << tip <<RESET<< endl;
+        cout <<BOLDYELLOW<< "[tip_handler]cofi:"<<this->last_jumpsite<<" tip: " << hex << tip <<RESET<< endl;
 #endif
         assert(this->pge_enabled);
 
@@ -289,21 +304,27 @@ private:
         decode_tip(tip);
         this->last_tip = tip;
 
-        if(this->last_target0 != 0){
-            //cofi_map.update_bb_list(this->last_target0, tip);
-            uint64_t last_cofi = cofi_map.get_cofi_addr(last_target0);
+        if(this->last_jumpsite != 0){
+            //cofi_map.update_bb_list(this->last_jumpsite, tip);
+            uint64_t last_cofi = cofi_map.get_cofi_addr(this->last_jumpsite);
             uint64_t cofi = cofi_map.get_cofi_addr(tip);
 
+            block_trans_t bt;
+            bt.from = last_cofi;
+            bt.to =  cofi;
+            bt.type = 0; // indirect call
+            execution_path.push_back(bt);
+            /*
             cofi_map.add_edge(last_cofi, cofi);
             update_tracebits(last_cofi, cofi);
-            
+
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
             control_flows.push_back(cofi);
-            
-            //cout <<BOLDRED<< "tipPUSH: "<<this->last_target0<<" "<<tip<< hex <<RESET<< endl;
+            */
+            //cout <<BOLDRED<< "tipPUSH: "<<this->last_jumpsite<<" "<<tip<< hex <<RESET<< endl;
 
-            this->last_target0 = 0;
+            this->last_jumpsite= 0;
         }
     }
 
@@ -318,16 +339,21 @@ private:
         }
 
 #ifdef DEBUG
-        cout <<BOLDYELLOW<< "[tip_pge_handler]cofi:"<<this->last_target0<<" tip: " << hex << tip <<RESET<< endl;
+        cout <<BOLDYELLOW<< "[tip_pge_handler]cofi:"<<this->last_jumpsite<<" tip: " << hex << tip <<RESET<< endl;
 
 #endif
         assert(this->last_tip == 0);
         this->last_tip = tip;
 
-        //assert(this->last_target0!=0);
-        if(this->last_target0!=0){
-            uint64_t last_cofi = cofi_map.get_cofi_addr(last_target0);
+        if(this->last_jumpsite!=0){
+            uint64_t last_cofi = cofi_map.get_cofi_addr(this->last_jumpsite);
             uint64_t cofi = cofi_map.get_cofi_addr(tip);
+
+            block_trans_t bt;
+            bt.from = last_cofi;
+            bt.to =  cofi;
+            bt.type = 0;
+            execution_path.push_back(bt);
 
             cofi_map.add_edge(last_cofi, cofi);
             update_tracebits(last_cofi, cofi);
@@ -336,9 +362,9 @@ private:
                 control_flows.push_back(last_cofi);
             control_flows.push_back(cofi);
             
-            //cout <<BOLDRED<< "tipePUSH: "<<this->last_target0<<" "<<tip<< hex <<RESET<< endl;
+            //cout <<BOLDRED<< "tipePUSH: "<<this->last_jumpsite<<" "<<tip<< hex <<RESET<< endl;
 
-            this->last_target0 = 0;
+            this->last_jumpsite = 0;
         }
     }
 
@@ -428,11 +454,8 @@ private:
     uint32_t decode_tnt(uint64_t entry_point); // for TNT mode only
     uint32_t decode_fake_tnt(uint64_t entry_point); // for FAKE_TNT mode only
     void decode_tip(uint64_t tip); // for TIP mode 
-    inline void update_tracebits(uint64_t from, uint64_t to){
-        uint16_t pos16 = (uint16_t)cofi_map.get_edge_id(from, to);
-        //cout << "[update_tracebits]get_edge_id: " << pos16 << endl;
-        trace_bits[pos16]++;
-    }
+
+
     /*
     inline void alter_bitmap(uint64_t cur_cofi) {
 
@@ -453,7 +476,7 @@ protected:
     cofi_inst_t* get_cofi_obj(uint64_t addr);
     
 public:
-    void dump_control_flows(FILE* f);
+    void dump_execution_path(FILE* f);
 };
 
 
@@ -482,7 +505,7 @@ public:
     uint64_t max_address;
     uint64_t entry_point;
     uint64_t target_addr;
-    
+
     uint64_t targets[10];
     uint64_t target_num;
 

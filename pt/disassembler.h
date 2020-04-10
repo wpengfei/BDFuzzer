@@ -154,6 +154,12 @@ public:
     bool contains(uint64_t addr) {
         return map_data[addr-base_address] != nullptr;
     }
+    inline bool valid_block(uint64_t b){
+        if (b >= 0 && b < bbnum)
+            return true;
+        else
+            return false;
+    }
     inline uint64_t get_cofi_addr(uint64_t tip){
         return map_data[tip-base_address]->inst_addr;
     }
@@ -169,24 +175,10 @@ public:
         return map_data[addr-base_address]; 
     }
    
-    inline void mark_mini_trace(vector<uint64_t> cf){
-        //mark trace
-        this->control_flow = cf;
-        for(uint64_t i = 0; i < cf.size(); i++){
-            uint64_t x = addr_to_idx[cf[i]];
-            this->mini_trace[x] = 1;
-        }   
-    }
-    inline void dump_control_flow(){
-        FILE* f;
-        f = fopen("pscore_trace.txt", "a+");
-        for(int i = 0; i < this->control_flow.size(); i ++) {
-            fprintf(f, "%p\n", control_flow[i]);
-        }
-        fclose(f);
-    }
-    inline void mark_single_mini_trace(uint64_t addr){
+
+    inline void mark_mini_trace_by_node(uint64_t addr){
         uint64_t x = addr_to_idx[addr];
+        assert(valid_block(x));
         this->mini_trace[x] = 1;
         
     }
@@ -199,12 +191,16 @@ public:
     inline uint64_t get_edge_id(uint64_t from, uint64_t to){
         uint64_t x = addr_to_idx[from];
         uint64_t y = addr_to_idx[to];
+        assert(valid_block(x));
+        assert(valid_block(y));
         return this->edge_map[x][y].id;
     }
 
     inline uint8_t add_edge(uint64_t from, uint64_t to){
         uint64_t x = addr_to_idx[from];
         uint64_t y = addr_to_idx[to];
+        assert(valid_block(x));
+        assert(valid_block(y));
         // if added before, skip
         if (this->edge_map[x][y].valid == false){
             this->edge_map[x][y].valid = true;
@@ -216,21 +212,16 @@ public:
         else
             return 0;
     }
-    inline void update_edge_count(vector<uint64_t> cf){
-        if(cf.size()<2){
-            printf("cf.size:%d\n", cf.size());
-            assert(cf.size() >= 2);
-        }
-        
-        uint64_t i, x, y;
-        i = 0;
-        while (i+1<cf.size()){
-            x = addr_to_idx[cf[i]];
-            y = addr_to_idx[cf[i+1]];
-            this->edge_map[x][y].valid = true;
-            this->edge_map[x][y].count++;
-            i++;
-        }
+    inline void update_edge_count(uint64_t from, uint64_t to){
+        uint64_t x, y;
+        x = addr_to_idx[from];
+        y = addr_to_idx[to];
+        assert(valid_block(x));
+        assert(valid_block(y));
+
+        this->edge_map[x][y].valid = true;
+        this->edge_map[x][y].count++;
+
     }
 
     void print_map_data(void);
@@ -239,7 +230,7 @@ public:
     void construct_edge_map(void);
     void print_edge_map(uint8_t arg);
 
-    uint64_t target_backward_search(uint64_t target_addr);
+    int target_backward_search(uint64_t target_addr);
     uint64_t target_backward_search_test(uint64_t target_addr);
     double score_back_path(void);
     double evaluate_seed(uint64_t* targets, uint64_t target_num);
