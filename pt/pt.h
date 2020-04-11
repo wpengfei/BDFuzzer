@@ -160,6 +160,7 @@ extern bool pt_ready;
 extern bool finished_decoding;
 extern bool finished_execution;
 
+
 typedef enum _branch_info_mode_t {
     RAW_PACKET_MODE,
     TIP_MODE,
@@ -227,11 +228,6 @@ typedef struct _packet_state_t {
 
 class pt_fuzzer;
 
-typedef struct _block_transitions{
-    uint64_t from;
-    uint64_t to;
-    uint8_t type; // indirect_call:0, direct 0
-}block_trans_t;
 
 class pt_packet_decoder{
     pt_fuzzer* fuzzer;
@@ -266,14 +262,14 @@ class pt_packet_decoder{
 
 public:
     uint64_t num_decoded_branch = 0;
-    vector<block_trans_t> execution_path;
-    vector<uint64_t> control_flows;
+    //vector<block_trans_t> execution_path;
+
 
 public:
     pt_packet_decoder(uint8_t* perf_pt_header, uint8_t* perf_pt_aux, pt_fuzzer* fuzzer);
     ~pt_packet_decoder();
     void set_tracing_flag() { tracing_flag = true; }
-    void decode(void);
+    void decode(vector<block_trans_t> &execution_path);
     uint8_t* get_trace_bits() { return trace_bits; }
 
     inline void update_tracebits(uint64_t from, uint64_t to){
@@ -285,7 +281,7 @@ public:
 private:
     uint64_t get_ip_val(unsigned char **pp, unsigned char *end, int len, uint64_t *last_ip);
 
-    inline void tip_handler(uint8_t** p, uint8_t** end){
+    inline void tip_handler(uint8_t** p, uint8_t** end, vector<block_trans_t> &execution_path){
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
 #ifdef DEBUG
@@ -299,7 +295,7 @@ private:
 #endif
         assert(this->pge_enabled);
 
-        decode_tnt(this->last_tip);
+        decode_tnt(this->last_tip, execution_path);
         
         decode_tip(tip);
         this->last_tip = tip;
@@ -328,7 +324,7 @@ private:
         }
     }
 
-    inline void tip_pge_handler (uint8_t** p, uint8_t** end){
+    inline void tip_pge_handler (uint8_t** p, uint8_t** end, vector<block_trans_t> &execution_path){
         this->pge_enabled = true;
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
@@ -355,13 +351,14 @@ private:
             bt.type = 0;
             execution_path.push_back(bt);
 
+            /*
             cofi_map.add_edge(last_cofi, cofi);
             update_tracebits(last_cofi, cofi);
             
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
             control_flows.push_back(cofi);
-            
+            */
             //cout <<BOLDRED<< "tipePUSH: "<<this->last_jumpsite<<" "<<tip<< hex <<RESET<< endl;
 
             this->last_jumpsite = 0;
@@ -369,7 +366,7 @@ private:
     }
 
     /*handle the TIP.PGD packet.*/
-    inline void tip_pgd_handler(uint8_t** p, uint8_t** end){
+    inline void tip_pgd_handler(uint8_t** p, uint8_t** end, vector<block_trans_t> &execution_path){
         this->pge_enabled = false;
         uint64_t tip = get_ip_val(p, *end, (*(*p)++ >> PT_PKT_TIP_SHIFT), &this->last_ip2);
         if(tip == app_entry_point) {
@@ -384,7 +381,7 @@ private:
 #endif
 
         
-        decode_tnt(this->last_tip);
+        decode_tnt(this->last_tip, execution_path);
         assert(count_tnt(tnt_cache_state) == 0);
         
         this->last_tip = 0;
@@ -401,11 +398,11 @@ private:
             this->last_tip = tip;
     }
 
-    inline void psb_handler(uint8_t** p){
+    inline void psb_handler(uint8_t** p,  vector<block_trans_t> &execution_path){
 #ifdef DEBUG
         cout << "[psb_handler]psb packet: " << (uint64_t)(**p)<< endl;
 #endif
-        decode_tnt(this->last_tip);
+        decode_tnt(this->last_tip, execution_path);
         
         assert(count_tnt(tnt_cache_state) == 0);
         (*p) += PT_PKT_PSB_LEN;
@@ -451,8 +448,8 @@ private:
 
     void print_tnt(tnt_cache_t* tnt_cache);
     void flush();
-    uint32_t decode_tnt(uint64_t entry_point); // for TNT mode only
-    uint32_t decode_fake_tnt(uint64_t entry_point); // for FAKE_TNT mode only
+    uint32_t decode_tnt(uint64_t entry_point, vector<block_trans_t> &execution_path); // for TNT mode only
+
     void decode_tip(uint64_t tip); // for TIP mode 
 
 
@@ -517,6 +514,8 @@ public:
     pt_tracer* trace;
 
     uint64_t num_runs = 0;
+
+    vector<block_trans_t> execution_path;
 
 public:
     pt_fuzzer(string raw_binary_file, uint64_t base_address, uint64_t max_address, uint64_t entry_point, uint64_t* target_buf, uint64_t num);

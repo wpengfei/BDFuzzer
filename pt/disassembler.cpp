@@ -280,7 +280,7 @@ my_cofi_map::~my_cofi_map() {
 
 void my_cofi_map::my_cofi_map::print_map_data(void){
     FILE* f;
-    f = fopen("pscore_trace.txt", "a+");
+    f = fopen("../pscore_trace.txt", "a+");
 
     cout<<"code_size: "<<code_size<<" base_address: "<<hex<<base_address<<endl;
     for (uint64_t i = 0; i<code_size; i++){
@@ -603,7 +603,7 @@ int my_cofi_map::target_backward_search(uint64_t target_addr){
 
     FILE* f;
 
-    f = fopen("pscore_trace.txt", "a+");
+    f = fopen("../pscore_trace.txt", "a+");
     
     fprintf(f,"[target_backward_search]mini_trace\n");
     for (uint64_t i = 0; i < bbnum; i++){
@@ -624,7 +624,6 @@ int my_cofi_map::target_backward_search(uint64_t target_addr){
     
     if (mini_trace[t] == 1) {//trace pass through target.
         fprintf(f, "[target_backward_search]trace pass through target, return -1\n");
-
         return -1;
     }
     
@@ -688,7 +687,7 @@ int my_cofi_map::target_backward_search(uint64_t target_addr){
 
         }
         if (path.size()==0 && pos[cur] == mini_map_x[cur].size()){
-            fprintf(f, "[target_backward_search] finish\n");
+            fprintf(f, "[target_backward_search] finish, did not meet trace node\n");
 
             break; //finish
         }
@@ -706,7 +705,7 @@ double my_cofi_map::score_back_path(void){
 
     FILE* f;
 
-    f = fopen("pscore_trace.txt", "a+");
+    f = fopen("../pscore_trace.txt", "a+");
 
     fprintf(f, "[score_back_path] search_result:\n");
     for (uint64_t i = 0; i < search_result.size(); i++){
@@ -751,25 +750,37 @@ double my_cofi_map::evaluate_seed(uint64_t* targets, uint64_t target_num){
     int path_num = 0;
     double max_p, cur_p = 0;
 
+    FILE* f;
+
+    f = fopen("../pscore_trace.txt", "a+");
+
     for(uint8_t i = 0; i < target_num; i++){
-        if(targets[i] < this->min_address || targets[i] > this->max_address)
+        fprintf(f, "[evaluate_seed] targets[%d]: %x, target_num:%x\n ", i, targets[i], target_num);
+        if(targets[i] < this->min_address || targets[i] > this->max_address){
+            fprintf(f, "[evaluate_seed] continue, min:%x, max:%x\n ", this->min_address, this->max_address);
             continue;
+        }
         else{
             /*paths stored in search_result, return path num*/
+    
             path_num = target_backward_search(targets[i]);
             if (path_num == 0)
-                continue;
+                cur_p = 0;
             else if (path_num == -1)
-                return 1;
-            else{
+                cur_p = 1;
+            else
                 cur_p = score_back_path();
-                if (cur_p > max_p)
-                    max_p = cur_p;
-                
-            }
+            
+            if (cur_p > max_p)
+                max_p = cur_p;
 
         }
     }
+    
+
+    fprintf(f, "[evaluate_seed] max_p: %f\n", max_p);
+
+    fclose(f);
     return max_p;
 }
 
@@ -818,3 +829,15 @@ void my_cofi_map::update_probability(void){
     }
 }
 
+/*
+void my_cofi_map::dump_execution_path(vector<block_trans_t> execution_path) {
+    FILE* f = fopen("../execution_path2.txt", "a");
+    if(f != nullptr) {
+        for(int i = 0; i < execution_path.size(); i ++) {
+            fprintf(f, "%d: %x->%x  %d\n", i, execution_path[i].from, execution_path[i].to, execution_path[i].type);
+        }
+        fprintf(f,"------\n");
+        fclose(f);
+    }
+
+}*/

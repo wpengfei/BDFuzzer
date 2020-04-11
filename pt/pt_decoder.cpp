@@ -177,7 +177,7 @@ void pt_packet_decoder::decode_tip(uint64_t tip) {
     
 }
 
-uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point){
+uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_t> &execution_path){
     uint8_t tnt;
     uint32_t num_tnt_decoded = 0;
     cofi_inst_t* cofi_obj = nullptr;
@@ -410,10 +410,10 @@ void pt_packet_decoder::dump_execution_path(FILE* f) {
     #ifdef DEBUG
     cout << "dump execution path, total edges are: " << execution_path.size() << endl;
     #endif
-
+    /*
     for(int i = 0; i < this->execution_path.size(); i ++) {
         fprintf(f, "%d: %x->%x  %d\n", i, execution_path[i].from, execution_path[i].to, execution_path[i].type);
-    }
+    }*/
 }
 
 static inline void print_unknown(unsigned char* p, unsigned char* end)
@@ -430,7 +430,7 @@ static inline void print_unknown(unsigned char* p, unsigned char* end)
     printf("\n");
 }
 
-void pt_packet_decoder::decode(void) {
+void pt_packet_decoder::decode(vector<block_trans_t> &execution_path) {
 
     if(this->aux_tail >= this->aux_head) {
         cerr << "failed to decode: invalid trace data: aux_head = " << this->aux_head << ", aux_tail = " << this->aux_tail << endl;
@@ -527,7 +527,7 @@ void pt_packet_decoder::decode(void) {
 #ifdef DEBUG
                 cout << "[pt_packet_decoder::decode] goto tip_handler"<< endl;
 #endif
-                tip_handler(&p, &end);
+                tip_handler(&p, &end, execution_path);
                 continue;
             }
 
@@ -537,7 +537,7 @@ void pt_packet_decoder::decode(void) {
 #ifdef DEBUG
                 cout << "[pt_packet_decoder::decode] goto tip_pge_handler"<< endl;
 #endif
-                tip_pge_handler(&p, &end);
+                tip_pge_handler(&p, &end, execution_path);
                 continue;
             }
 
@@ -547,7 +547,7 @@ void pt_packet_decoder::decode(void) {
 #ifdef DEBUG
                 cout << "[pt_packet_decoder::decode] goto tip_pgd_handler"<< endl;
 #endif
-                tip_pgd_handler( &p, &end);
+                tip_pgd_handler( &p, &end, execution_path);
                 continue;
             }
 
@@ -578,7 +578,7 @@ void pt_packet_decoder::decode(void) {
 #ifdef DEBUG
                     cout << "[pt_packet_decoder::decode] goto psb_handler"<< endl;
 #endif
-                    psb_handler(&p);
+                    psb_handler(&p, execution_path);
                     continue;
                 }
 

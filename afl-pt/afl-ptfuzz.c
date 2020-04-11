@@ -4428,16 +4428,16 @@ static void show_stats(void) {
 
   SAYF (bSTG bV bSTOP "  total tmouts : " cRST "%-22s " bSTG bV "\n", tmp);
 
-  SAYF(bV bSTOP " cur_target_addr: " cRST "%x%-16s " bSTG bV bSTOP
-         " top_directed_len  : %s%-17s " bSTG bV "\n", cur_target_addr, cRST,
+  SAYF(bV bSTOP " cur_target_addr: " cRST "%-18x " bSTG bV bSTOP
+         " top_directed_len  :" cRST " %-18s " bSTG bV "\n", cur_target_addr, 
          DI(top_directed_len));
 
   SAYF(bV bSTOP " dp value : " cRST "%-24s " bSTG bV bSTOP
-         " queued_directed  : %s%-15s " bSTG bV "\n", DF(dp), cRST,
+         " queued_directed : " cRST "%-20s " bSTG bV "\n", DF(dp),
          DI(queued_directed));
 
-  SAYF(bV bSTOP cRST "%-40s " bSTG bV bSTOP
-         " pending_directed  : %s%-17s " bSTG bV "\n", cRST,
+  SAYF(bV bSTOP "%-40s " bSTG bV bSTOP
+         " pending_directed :" cRST " %-18s " bSTG bV "\n", cRST,
          DI(pending_directed));
 
   SAYF(bV bSTOP " cycle_new_directed : " cRST "%-14s " bSTG bV bSTOP
@@ -8433,7 +8433,7 @@ int main(int argc, char** argv) {
   }
   num = i;
   printf("num = %d\n", num);
-  
+
   cur_target_addr = targets_buf[0];
 
   init_pt_fuzzer(raw_bin, min_addr, max_addr, entry_point, targets_buf, num);

@@ -3,8 +3,9 @@
 sudo rm -rf test/output/ 
 mkdir test/output/
 
-rm -f build/pscore_trace.txt
-
+rm -f pscore_trace.txt
+rm -f pscore.txt
+rm -f execution_path.txt
 sudo rm -r build
 mkdir build
 cd build

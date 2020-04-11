@@ -60,6 +60,13 @@ along with QEMU-PT.  If not, see <http://www.gnu.org/licenses/>.
 
 using namespace std;
 
+typedef struct _block_transitions{
+    uint64_t from;
+    uint64_t to;
+    uint8_t type; // indirect_call:0, direct 0
+}block_trans_t;
+
+
 typedef struct{
     uint16_t opcode;
     uint8_t modrm;
@@ -175,7 +182,6 @@ public:
         return map_data[addr-base_address]; 
     }
    
-
     inline void mark_mini_trace_by_node(uint64_t addr){
         uint64_t x = addr_to_idx[addr];
         assert(valid_block(x));

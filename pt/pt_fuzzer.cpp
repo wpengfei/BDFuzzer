@@ -216,23 +216,22 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
 
 
 
-    
-    //cout << "[pt_fuzzer::stop_pt_trace]start to decode"<< endl;i
     this->cofi_map.clear_mini_trace(); // clear mini trace of last time
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
-    decoder.decode(); // main phase to decode pt packets
+    decoder.decode(this->execution_path); // main phase to decode pt packets
 
     uint64_t from, to, type=0;
-	for (uint64_t i = 0; i < decoder.execution_path.size(); i++){
-		from = decoder.execution_path[i].from;
-		to = decoder.execution_path[i].to;
-		type = decoder.execution_path[i].type;
+	for (uint64_t i = 0; i < this->execution_path.size(); i++){
+		from = this->execution_path[i].from;
+		to = this->execution_path[i].to;
+		type = this->execution_path[i].type;
 		decoder.update_tracebits(from, to);
-		if(!skip_logging){
-			this->cofi_map.mark_mini_trace_by_node(from);
-			this->cofi_map.mark_mini_trace_by_node(to);
-			this->cofi_map.update_edge_count(from, to); // do not clear
+		this->cofi_map.mark_mini_trace_by_node(from); // mark execution path to mini_trace
+		this->cofi_map.mark_mini_trace_by_node(to);
+
+		if(!skip_logging){	
+			this->cofi_map.update_edge_count(from, to); // update edge statistics
 			if(type == 0) //indirect call
 				this->cofi_map.add_edge(from, to);
             
@@ -241,22 +240,8 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
 
     //this->cofi_map.print_edge_map(1); // 0 valid, 1 count 2 p
     //this->cofi_map.print_edge_map(2); // 0 valid, 1 count 2 p
-    /*
-    FILE* f1;
-    f1 = fopen("pscore_trace.txt", "a+");
 
-  	fprintf(f1, "[stop_pt_trace] clear mini trace\n");
-
-  	fclose(f1);*/
 	
-    /*
-    if(!skip_logging){
-
-	    this->cofi_map.mark_mini_trace(decoder.control_flows); // clear after each run
-
-	    this->cofi_map.update_edge_count(decoder.control_flows); // do not clear
-
-	}*/
 
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << endl;
@@ -267,48 +252,28 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
     delete this->trace;
     this->trace = nullptr;
     memcpy(trace_bits, decoder.get_trace_bits(), MAP_SIZE);
+    //printf("%x");
     num_runs ++;
 
 
-
+    /*
     FILE* f = fopen("../execution_path.txt", "w");
     if(f != nullptr) {
-        decoder.dump_execution_path(f);
+        for(int i = 0; i < execution_path.size(); i ++) {
+		    fprintf(f, "%d: %x->%x  %d\n", i, execution_path[i].from, execution_path[i].to, execution_path[i].type);
+		}
+        fprintf(f,"------\n");
         fclose(f);
     }
     else {
         cerr << "[pt_fuzzer::stop_pt_trace]open file control_inst_flow.txt failed." << endl;
-    }
+    }*/
 
-
+    this->execution_path.clear();
 }
 
 		
 
-
-/*
-pt_packet_decoder* pt_fuzzer::debug_stop_pt_trace(uint8_t *trace_bits, branch_info_mode_t mode) {
-    if(!this->trace->stop_trace()){
-        cerr << "stop PT event failed." << endl;
-        exit(-1);
-    }
-#ifdef DEBUG
-    cout << "stop pt trace OK." << endl;
-#endif
-    pt_packet_decoder* decoder = new pt_packet_decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
-    decoder->set_tracing_flag();
-    decoder->decode();
-#ifdef DEBUG
-    cout << "decode finished, total number of decoded branch: " << decoder->num_decoded_branch << endl;
-#endif
-    this->trace->close_pt();
-    delete this->trace;
-    this->trace = nullptr;
-    memcpy(trace_bits, decoder->get_trace_bits(), MAP_SIZE);
-    num_runs ++;
-    return decoder;
-}
-*/
 
 
 
@@ -348,24 +313,32 @@ extern "C" {
 	    the_fuzzer->cofi_map.update_probability();
 	}
 	float get_p_score(){
-		//the_fuzzer->cofi_map.dump_control_flow();
+		the_fuzzer->cofi_map.update_probability();
+		//the_fuzzer->cofi_map.dump_execution_path();
 		float p_score = the_fuzzer->cofi_map.evaluate_seed(the_fuzzer->targets, the_fuzzer->target_num);
 		the_fuzzer->cofi_map.clear_mini_trace();
+
+	    FILE* f1;
+	    f1 = fopen("../pscore.txt", "a+");
+
+	  	fprintf(f1, "[get_p_score]%f\n", p_score);
+
+	  	fclose(f1);
+
+
+	  	FILE* f = fopen("../execution_path2.txt", "w");
+	    if(f != nullptr) {
+	        for(int i = 0; i < the_fuzzer->execution_path.size(); i ++) {
+		        fprintf(f, "%d: %x->%x  %d\n", i, the_fuzzer->execution_path[i].from, the_fuzzer->execution_path[i].to, the_fuzzer->execution_path[i].type);
+		    }
+	        fprintf(f,"------\n");
+	        fclose(f);
+	    }
+	    else {
+	        cerr << "[get_p_score]open file control_inst_flow.txt failed." << endl;
+	    }
+
 		return p_score;
-		/*
-		uint8_t ret = the_fuzzer->cofi_map.target_backward_search(the_fuzzer->targets, the_fuzzer->target_num);
-		float p;
-		if (ret == 0 || ret == 1){// 0 cannot find a conversion path 
-			//the_fuzzer->cofi_map.clear_mini_trace();
-			return (float)ret;           // trace goes through the target 
-		}
-		else{
-			// return the largest p score when there are more than one conversion path
-		    p = the_fuzzer->cofi_map.score_back_path(); 
-			//the_fuzzer->cofi_map.clear_mini_trace();
-			return p;
-		}
-		*/
 
 	}
 
