@@ -213,35 +213,41 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]stop pt trace OK." << endl;
 #endif
+    FILE* f = fopen("../execution_path.txt", "w");
 
-
-
-    this->cofi_map.clear_mini_trace(); // clear mini trace of last time
+    this->cofi_map.clear_mini_trace(); // clear mini trace of last execution
+    this->execution_path.clear();
+    fprintf(f," after clear%d------\n", execution_path.size());
 
     pt_packet_decoder decoder(trace->get_perf_pt_header(), trace->get_perf_pt_aux(), this);
+    
+    decoder.clear_tracebits();
+
     decoder.decode(this->execution_path); // main phase to decode pt packets
+
+    
 
     uint64_t from, to, type=0;
 	for (uint64_t i = 0; i < this->execution_path.size(); i++){
 		from = this->execution_path[i].from;
 		to = this->execution_path[i].to;
 		type = this->execution_path[i].type;
-		decoder.update_tracebits(from, to);
+		
 		this->cofi_map.mark_mini_trace_by_node(from); // mark execution path to mini_trace
 		this->cofi_map.mark_mini_trace_by_node(to);
-
+		if(type == 0) //indirect call
+			this->cofi_map.add_edge(from, to);
+		//update_tracebits() should after add_edge(), because of the get_edge_id issue.
+		decoder.update_tracebits(from, to);
+		//stop logging edge counts when PUT is run with the same inputs for many times when calibrate cases.
 		if(!skip_logging){	
 			this->cofi_map.update_edge_count(from, to); // update edge statistics
-			if(type == 0) //indirect call
-				this->cofi_map.add_edge(from, to);
-            
 		}
 	}
 
     //this->cofi_map.print_edge_map(1); // 0 valid, 1 count 2 p
     //this->cofi_map.print_edge_map(2); // 0 valid, 1 count 2 p
 
-	
 
 #ifdef DEBUG
     cout << "[pt_fuzzer::stop_pt_trace]decode finished, total number of decoded branch: " << decoder.num_decoded_branch << endl;
@@ -253,29 +259,24 @@ void pt_fuzzer::stop_pt_trace(uint8_t *trace_bits, uint8_t skip_logging) {
     this->trace = nullptr;
     memcpy(trace_bits, decoder.get_trace_bits(), MAP_SIZE);
     //printf("%x");
-    num_runs ++;
+    num_runs++;
 
-
-    /*
-    FILE* f = fopen("../execution_path.txt", "w");
+    
     if(f != nullptr) {
         for(int i = 0; i < execution_path.size(); i ++) {
 		    fprintf(f, "%d: %x->%x  %d\n", i, execution_path[i].from, execution_path[i].to, execution_path[i].type);
 		}
-        fprintf(f,"------\n");
+        fprintf(f," execution_path.size()%d, num%d------\n", execution_path.size(), num_runs);
         fclose(f);
     }
     else {
         cerr << "[pt_fuzzer::stop_pt_trace]open file control_inst_flow.txt failed." << endl;
-    }*/
+    }
 
-    this->execution_path.clear();
+    //this->execution_path.clear();
 }
 
 		
-
-
-
 
 extern "C" {
 	pt_fuzzer* the_fuzzer;
@@ -316,7 +317,7 @@ extern "C" {
 		the_fuzzer->cofi_map.update_probability();
 		//the_fuzzer->cofi_map.dump_execution_path();
 		float p_score = the_fuzzer->cofi_map.evaluate_seed(the_fuzzer->targets, the_fuzzer->target_num);
-		the_fuzzer->cofi_map.clear_mini_trace();
+		//the_fuzzer->cofi_map.clear_mini_trace();
 
 	    FILE* f1;
 	    f1 = fopen("../pscore.txt", "a+");
@@ -324,7 +325,6 @@ extern "C" {
 	  	fprintf(f1, "[get_p_score]%f\n", p_score);
 
 	  	fclose(f1);
-
 
 	  	FILE* f = fopen("../execution_path2.txt", "w");
 	    if(f != nullptr) {

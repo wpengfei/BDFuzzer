@@ -6,6 +6,8 @@ mkdir test/output/
 rm -f pscore_trace.txt
 rm -f pscore.txt
 rm -f execution_path.txt
+rm -f execution_path2.txt
+
 sudo rm -r build
 mkdir build
 cd build

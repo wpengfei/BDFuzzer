@@ -250,6 +250,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                         bt.to = target_cofi;
                         bt.type = 1; // conditional
                         execution_path.push_back(bt);
+                        //update_tracebits(cofi_obj->inst_addr, target_cofi);
 
                         /*
                         cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);
@@ -280,6 +281,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                     bt.to = next_cofi;
                     bt.type = 1; // conditional jump
                     execution_path.push_back(bt);
+                    //update_tracebits(cofi_obj->inst_addr, next_cofi);
 
                     /*
                     cofi_map.add_edge(cofi_obj->inst_addr, next_cofi);
@@ -319,6 +321,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                     bt.to = target_cofi;
                     bt.type = 2; // unconditional jump
                     execution_path.push_back(bt);
+                    //update_tracebits(cofi_obj->inst_addr, target_cofi);
 
                     /*
                     cofi_map.add_edge(cofi_obj->inst_addr, target_cofi);

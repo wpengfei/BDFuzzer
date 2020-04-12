@@ -278,6 +278,10 @@ public:
         trace_bits[pos16]++;
     }
 
+    inline void clear_tracebits(){
+        memset(trace_bits, 0, MAP_SIZE);
+    }
+
 private:
     uint64_t get_ip_val(unsigned char **pp, unsigned char *end, int len, uint64_t *last_ip);
 
@@ -310,9 +314,10 @@ private:
             bt.to =  cofi;
             bt.type = 0; // indirect call
             execution_path.push_back(bt);
+            //update_tracebits(last_cofi, cofi);
             /*
             cofi_map.add_edge(last_cofi, cofi);
-            update_tracebits(last_cofi, cofi);
+            
 
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
@@ -350,10 +355,11 @@ private:
             bt.to =  cofi;
             bt.type = 0;
             execution_path.push_back(bt);
+            update_tracebits(last_cofi, cofi);
 
             /*
             cofi_map.add_edge(last_cofi, cofi);
-            update_tracebits(last_cofi, cofi);
+            
             
             if (control_flows.size()==0)
                 control_flows.push_back(last_cofi);
