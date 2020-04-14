@@ -64,6 +64,7 @@ typedef struct _block_transitions{
     uint64_t from;
     uint64_t to;
     uint8_t type; // indirect_call:0, direct 0
+    uint64_t target; //target address
 }block_trans_t;
 
 

@@ -67,8 +67,8 @@ entry = info['entry']
 
 # compose the command line for running AFL
 if mem_limit != None:
-    cmdline = "sudo %s -r %s -m %d -l %d -h %d -e %d %s %s %s @@" % (afl_bin, raw_bin, mem_limit, min_addr, max_addr, entry, afl_args, raw_bin_file, target_args)
+    cmdline = "sudo %s -r %s -m %d -l %x -h %x -e %x %s %s %s @@" % (afl_bin, raw_bin, mem_limit, min_addr, max_addr, entry, afl_args, raw_bin_file, target_args)
 else:
-    cmdline = "sudo %s -r %s -l %d -h %d -e %d %s %s %s @@" % (afl_bin, raw_bin, min_addr, max_addr, entry, afl_args, raw_bin_file, target_args)
+    cmdline = "sudo %s -r %s -l %x -h %x -e %x %s %s %s @@" % (afl_bin, raw_bin, min_addr, max_addr, entry, afl_args, raw_bin_file, target_args)
 print cmdline
 os.system(cmdline)

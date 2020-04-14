@@ -249,6 +249,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                         bt.from = cofi_obj->inst_addr;
                         bt.to = target_cofi;
                         bt.type = 1; // conditional
+                        bt.target = cofi_obj->target_addr;
                         execution_path.push_back(bt);
                         //update_tracebits(cofi_obj->inst_addr, target_cofi);
 
@@ -280,6 +281,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                     bt.from = cofi_obj->inst_addr;
                     bt.to = next_cofi;
                     bt.type = 1; // conditional jump
+                    bt.target = 0;
                     execution_path.push_back(bt);
                     //update_tracebits(cofi_obj->inst_addr, next_cofi);
 
@@ -320,6 +322,7 @@ uint32_t pt_packet_decoder::decode_tnt(uint64_t entry_point, vector<block_trans_
                     bt.from = cofi_obj->inst_addr;
                     bt.to = target_cofi;
                     bt.type = 2; // unconditional jump
+                    bt.target = cofi_obj->target_addr;
                     execution_path.push_back(bt);
                     //update_tracebits(cofi_obj->inst_addr, target_cofi);
 
@@ -411,7 +414,7 @@ uint64_t pt_packet_decoder::get_ip_val(unsigned char **pp, unsigned char *end, i
 
 void pt_packet_decoder::dump_execution_path(FILE* f) {
     #ifdef DEBUG
-    cout << "dump execution path, total edges are: " << execution_path.size() << endl;
+    //cout << "dump execution path, total edges are: " << execution_path.size() << endl;
     #endif
     /*
     for(int i = 0; i < this->execution_path.size(); i ++) {

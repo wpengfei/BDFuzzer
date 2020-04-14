@@ -786,9 +786,6 @@ double my_cofi_map::evaluate_seed(uint64_t* targets, uint64_t target_num){
 
 
 
-
-
-
 //update the probability in the edge_map every 30 runs.
 void my_cofi_map::update_probability(void){
     uint64_t x, y, sum = 0;

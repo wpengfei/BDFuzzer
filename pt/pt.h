@@ -313,6 +313,7 @@ private:
             bt.from = last_cofi;
             bt.to =  cofi;
             bt.type = 0; // indirect call
+            bt.target = tip;
             execution_path.push_back(bt);
             //update_tracebits(last_cofi, cofi);
             /*
@@ -354,8 +355,9 @@ private:
             bt.from = last_cofi;
             bt.to =  cofi;
             bt.type = 0;
+            bt.target = tip;
             execution_path.push_back(bt);
-            update_tracebits(last_cofi, cofi);
+            //update_tracebits(last_cofi, cofi);
 
             /*
             cofi_map.add_edge(last_cofi, cofi);

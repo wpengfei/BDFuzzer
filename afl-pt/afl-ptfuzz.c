@@ -8341,17 +8341,17 @@ int main(int argc, char** argv) {
 
       case 'l':
         min_addr = strtoul(optarg, NULL, 0);
-        printf("min_addr: %ld\n", min_addr);
+        printf("min_addr: %lx\n", min_addr);
         break;
 
       case 'h':
         max_addr = strtoul(optarg, NULL, 0);
-        printf("max_addr: %ld\n", max_addr);
+        printf("max_addr: %lx\n", max_addr);
         break;
 
       case 'e':
         entry_point = strtoul(optarg, NULL, 0);
-        printf("entry_point: %ld\n", entry_point);
+        printf("entry_point: %lx\n", entry_point);
         break;
 
       default:

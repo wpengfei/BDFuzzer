@@ -123,7 +123,10 @@ bool pt_fuzzer::build_cofi_map() {
     //
 
     cofi_map.construct_bb_list();
+    cout << "[pt_fuzzer::build_cofi_map] construct bb_list complete"<<endl; 
+
     cofi_map.construct_edge_map();
+    cout << "[pt_fuzzer::build_cofi_map] construct edge_map complete"<<endl; 
     
 #ifdef DEBUG
     printf("----------cofi_map\n");
@@ -326,10 +329,11 @@ extern "C" {
 
 	  	fclose(f1);
 
-	  	FILE* f = fopen("../execution_path2.txt", "w");
+	  	FILE* f = fopen("../execution_path2.txt", "a");
 	    if(f != nullptr) {
 	        for(int i = 0; i < the_fuzzer->execution_path.size(); i ++) {
-		        fprintf(f, "%d: %x->%x  %d\n", i, the_fuzzer->execution_path[i].from, the_fuzzer->execution_path[i].to, the_fuzzer->execution_path[i].type);
+		        fprintf(f, "%d: %x->%x (%x)  %d\n", i, the_fuzzer->execution_path[i].from, 
+		        the_fuzzer->execution_path[i].to, the_fuzzer->execution_path[i].target, the_fuzzer->execution_path[i].type);
 		    }
 	        fprintf(f,"------\n");
 	        fclose(f);
